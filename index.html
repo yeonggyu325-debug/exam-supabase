@@ -1730,7 +1730,6 @@ async function _sbGetAppData() {
     questionBank: (qbRes.data || []).map((q) => ({
       id: q.id,
       category: q.category,
-      difficulty: q.difficulty,
       text: q.text,
       options: [q.option_1, q.option_2, q.option_3, q.option_4, q.option_5].filter((v) => v !== null && v !== ""),
       answerIndex: q.answer_index,
