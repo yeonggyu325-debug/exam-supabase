@@ -1769,23 +1769,36 @@ async function _sbSaveAppData(snapshot) {
     }
 
     if (Array.isArray(snapshot.questionBank) && snapshot.questionBank.length) {
-      await _sb.from("question_bank").upsert(
-        snapshot.questionBank.map((q) => ({
-          id: q.id,
-          category: q.category || "",
-          difficulty: q.difficulty || "기본",
-          text: q.text || "",
-          option_1: (q.options || [])[0] || "",
-          option_2: (q.options || [])[1] || "",
-          option_3: (q.options || [])[2] || "",
-          option_4: (q.options || [])[3] || "",
-          option_5: (q.options || [])[4] || "",
-          answer_index: q.answerIndex ?? 0,
-          active: q.active !== false
-        })),
-        { onConflict: "id" }
-      );
-    }
+      if (Array.isArray(snapshot.questionBank) && snapshot.questionBank.length) {
+  const rows = snapshot.questionBank.map((q) => ({
+    id: q.id ?? null,
+    category: q.category || "",
+    difficulty: q.difficulty || "기본",
+    text: q.text || "",
+    option_1: (q.options || [])[0] || "",
+    option_2: (q.options || [])[1] || "",
+    option_3: (q.options || [])[2] || "",
+    option_4: (q.options || [])[3] || "",
+    option_5: (q.options || [])[4] || "",
+    answer_index: q.answerIndex ?? 0,
+    active: q.active !== false
+  }));
+
+  const existing = rows.filter((r) => r.id !== null && r.id !== undefined && r.id !== "");
+  const fresh = rows.filter((r) => r.id === null || r.id === undefined || r.id === "");
+
+  if (existing.length) {
+    const { error } = await _sb.from("question_bank").upsert(existing, { onConflict: "id" });
+    if (error) throw error;
+  }
+
+  if (fresh.length) {
+    const insertRows = fresh.map(({ id, ...rest }) => rest);
+    const { error } = await _sb.from("question_bank").insert(insertRows);
+    if (error) throw error;
+  }
+}
+    
 
     if (snapshot.examSettings) {
       const s = snapshot.examSettings;
