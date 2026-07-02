@@ -4366,11 +4366,14 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
     return;
   }
 
+  const personName = user.name || latest.name || "";
+  const personDept = user.department || latest.department || "";
+
   modalRoot.innerHTML = `
     <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
       <section class="modal" style="max-width:760px">
         <h2 id="answerReviewTitle">문제세트/선택 답안</h2>
-        <p class="muted" style="margin:6px 0 14px">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")}</p>
+        <p class="muted" style="margin:6px 0 14px">${escapeHtml(personDept)} ${escapeHtml(personName)}</p>
         <div class="notice">데이터베이스에서 제출 상세와 문제은행을 조회하는 중입니다.</div>
       </section>
     </div>`;
@@ -4384,10 +4387,10 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
         <section class="modal" style="max-width:820px">
           <h2 id="answerReviewTitle">문제세트/선택 답안</h2>
-          <p class="muted" style="margin:6px 0 14px">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")}</p>
+          <p class="muted" style="margin:6px 0 14px">${escapeHtml(personDept)} ${escapeHtml(personName)}</p>
           <div class="notice warning">
-            문제 원본은 <strong>question_bank</strong>에 있지만, 응시자별로 어떤 문제 ID가 출제됐고 어떤 답을 골랐는지는 제출 시점에 별도로 저장돼야 합니다.<br>
-            이 제출 기록에는 그 상세 로그가 없어 과거 결과는 복원할 수 없습니다. 이 파일 적용 이후 새로 제출한 결과부터 확인됩니다.
+            문제 원본은 <strong>question_bank</strong>에 있지만, 응시자별로 어떤 문제가 출제됐고 어떤 답을 골랐는지는 제출 시점에 별도로 저장돼야 합니다.<br>
+            이 제출 기록에는 상세 로그가 없어 과거 결과는 복원할 수 없습니다. 이 파일 적용 이후 새로 제출한 결과부터 확인됩니다.
           </div>
           <div class="modal-actions"><button class="btn primary" type="button" onclick="closeModal()">닫기</button></div>
         </section>
@@ -4395,61 +4398,127 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
     return;
   }
 
-  const rows = answerReview.map(item => {
-    const options = (item.options || []).map((opt, idx) => {
-      const marks = [];
-      if (idx === item.selectedDisplayIndex) marks.push("선택");
-      if (idx === item.correctDisplayIndex) marks.push("정답");
-      const badge = marks.length ? ` <strong style="color:${idx === item.correctDisplayIndex ? '#166534' : '#1d4ed8'}">[${marks.join('/')}]</strong>` : "";
-      return `<div style="margin:2px 0">${idx + 1}. ${escapeHtml(opt)}${badge}</div>`;
-    }).join("");
+  const correctCount = answerReview.filter(item => item.correct).length;
+  const wrongCount = answerReview.filter(item => !item.correct && !item.unanswered).length;
+  const unansweredCount = answerReview.filter(item => item.unanswered).length;
+  const totalCount = answerReview.length;
+  const categories = Array.from(new Set(answerReview.map(item => item.category).filter(Boolean)));
+  const summary = log?.questionSetSummary || {};
+  const passText = latest.disqualified ? "실격" : (latest.passed ? "합격" : "불합격");
+  const passClass = latest.disqualified || !latest.passed ? "danger" : "success";
+  const optionList = (item) => (item.options || []).map((opt, idx) => {
+    const isSelected = idx === item.selectedDisplayIndex;
+    const isCorrect = idx === item.correctDisplayIndex;
+    const cls = isSelected && isCorrect ? "ok" : (isSelected ? "pick" : (isCorrect ? "answer" : ""));
+    const label = isSelected && isCorrect ? "선택·정답" : (isSelected ? "선택" : (isCorrect ? "정답" : ""));
+    return `
+      <li class="ar-option ${cls}">
+        <span class="ar-option-no">${idx + 1}</span>
+        <span class="ar-option-text">${escapeHtml(opt)}</span>
+        ${label ? `<span class="ar-option-badge">${label}</span>` : ""}
+      </li>
+    `;
+  }).join("");
+
+  const cards = answerReview.map(item => {
     const status = item.unanswered
       ? `<span class="badge warning">미응답</span>`
       : item.correct
         ? `<span class="badge success">정답</span>`
         : `<span class="badge danger">오답</span>`;
-    return `<tr>
-      <td style="text-align:center;font-weight:700">${item.no}</td>
-      <td>${escapeHtml(item.category || "-")}</td>
-      <td><div style="font-weight:700;margin-bottom:6px">${escapeHtml(item.text || "")}</div><div style="font-size:12px;color:var(--muted)">문항ID: ${escapeHtml(String(item.questionId || ""))}${item.questionBankFound ? " · question_bank 조회" : " · 저장 로그 기준"}</div></td>
-      <td style="min-width:260px">${options}</td>
-      <td>${item.unanswered ? "-" : escapeHtml(item.selectedText || "")}</td>
-      <td>${escapeHtml(item.correctText || "")}</td>
-      <td style="text-align:center">${status}</td>
-    </tr>`;
+    return `
+      <article class="ar-card">
+        <div class="ar-card-head">
+          <div>
+            <span class="ar-no">${item.no}번</span>
+            <span class="ar-cat">${escapeHtml(item.category || "미분류")}</span>
+          </div>
+          ${status}
+        </div>
+        <div class="ar-question">${escapeHtml(item.text || "")}</div>
+        <ol class="ar-options">${optionList(item)}</ol>
+      </article>
+    `;
   }).join("");
 
-  const summary = log?.questionSetSummary || {};
-  const categories = Array.from(new Set(answerReview.map(item => item.category).filter(Boolean)));
   modalRoot.innerHTML = `
     <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
-      <section class="modal" style="max-width:min(1180px,96vw);width:96vw;max-height:92vh;overflow:auto">
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
-          <div>
-            <h2 id="answerReviewTitle" style="margin-bottom:6px">문제세트/선택 답안</h2>
-            <p class="muted" style="margin:0">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")} · ${escapeHtml(latest.quarter || "")}</p>
-            <p class="muted" style="margin:6px 0 0;font-size:12px">문제 본문/보기/정답은 question_bank 기준으로 조회하고, 선택 답안은 제출 로그 기준으로 표시합니다.</p>
+      <section class="modal ar-modal" style="max-width:min(1160px,96vw);width:96vw;max-height:92vh;overflow:auto">
+        <style>
+          .ar-modal { padding: 0; overflow: hidden; }
+          .ar-header { position: sticky; top: 0; z-index: 3; background: var(--card); border-bottom: 1px solid var(--border); padding: 22px 24px 16px; }
+          .ar-title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+          .ar-title { margin:0 0 6px; font-size:22px; }
+          .ar-subtitle { margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+          .ar-body { padding: 18px 24px 24px; background: #f8fafc; }
+          .ar-summary-grid { display:grid; grid-template-columns: 1.1fr .9fr; gap:12px; margin-bottom:14px; }
+          .ar-panel { background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow: 0 10px 24px rgba(15,23,42,.04); }
+          .ar-panel h3 { margin:0 0 10px; font-size:14px; color:#334155; }
+          .ar-info-table { width:100%; border-collapse:collapse; font-size:13px; }
+          .ar-info-table th, .ar-info-table td { border:1px solid #e5e7eb; padding:8px 10px; vertical-align:top; }
+          .ar-info-table th { width:96px; background:#f8fafc; color:#475569; font-weight:700; }
+          .ar-score-box { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+          .ar-score { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#f8fafc; }
+          .ar-score .label { font-size:12px; color:#64748b; margin-bottom:4px; }
+          .ar-score .value { font-size:20px; font-weight:800; color:#0f172a; }
+          .ar-score .value.good { color:#166534; }
+          .ar-score .value.bad { color:#b91c1c; }
+          .ar-list { display:grid; gap:12px; }
+          .ar-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow: 0 10px 24px rgba(15,23,42,.04); }
+          .ar-card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+          .ar-no { display:inline-flex; align-items:center; justify-content:center; min-width:44px; height:28px; border-radius:999px; background:#eff6ff; color:#1d4ed8; font-weight:800; font-size:13px; margin-right:6px; }
+          .ar-cat { display:inline-flex; align-items:center; height:28px; border-radius:999px; background:#f1f5f9; color:#334155; padding:0 10px; font-size:12px; font-weight:700; }
+          .ar-question { font-size:15px; font-weight:800; line-height:1.55; color:#0f172a; margin-bottom:12px; }
+          .ar-options { list-style:none; padding:0; margin:12px 0 0; display:grid; gap:7px; }
+          .ar-option { display:flex; align-items:flex-start; gap:8px; border:1px solid #e5e7eb; border-radius:12px; padding:9px 10px; background:#fff; }
+          .ar-option-no { flex:0 0 auto; width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; color:#334155; font-weight:800; font-size:12px; }
+          .ar-option-text { flex:1; line-height:1.45; }
+          .ar-option-badge { flex:0 0 auto; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#e2e8f0; color:#334155; }
+          .ar-option.pick { border-color:#93c5fd; background:#eff6ff; }
+          .ar-option.answer { border-color:#86efac; background:#f0fdf4; }
+          .ar-option.ok { border-color:#22c55e; background:#dcfce7; }
+          .ar-option.pick .ar-option-badge { background:#dbeafe; color:#1d4ed8; }
+          .ar-option.answer .ar-option-badge, .ar-option.ok .ar-option-badge { background:#bbf7d0; color:#166534; }
+          @media (max-width: 900px) { .ar-summary-grid { grid-template-columns:1fr; } .ar-title-row { flex-direction:column; } .ar-body { padding:14px; } .ar-header { padding:18px 16px 14px; } }
+        </style>
+        <div class="ar-header">
+          <div class="ar-title-row">
+            <div>
+              <h2 id="answerReviewTitle" class="ar-title">문제세트 및 답안 확인</h2>
+              <p class="ar-subtitle">제출 완료된 응시자의 출제 문항과 선택/정답 표시를 확인합니다.</p>
+            </div>
+            <button class="btn" type="button" onclick="closeModal()">닫기</button>
           </div>
-          <button class="btn" type="button" onclick="closeModal()">닫기</button>
         </div>
-        <div class="metrics-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:12px">
-          <div class="metric-card"><div class="label">점수</div><div class="value">${latest.percentageScore}점</div></div>
-          <div class="metric-card"><div class="label">정답 수</div><div class="value">${latest.correctCount}/${latest.totalCount}</div></div>
-          <div class="metric-card"><div class="label">제출일시</div><div class="value" style="font-size:16px">${formatDateTime(latest.submittedAt)}</div></div>
-          <div class="metric-card"><div class="label">문제 카테고리</div><div class="value" style="font-size:14px">${escapeHtml((summary.categories || categories).join(', ') || '-')}</div></div>
-        </div>
-        <div class="table-wrap" style="max-height:62vh;overflow:auto">
-          <table>
-            <thead>
-              <tr><th>No</th><th>분류</th><th>문제</th><th>보기/표시</th><th>선택답안</th><th>정답</th><th>결과</th></tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
+        <div class="ar-body">
+          <div class="ar-summary-grid">
+            <section class="ar-panel">
+              <h3>응시자 정보</h3>
+              <table class="ar-info-table">
+                <tbody>
+                  <tr><th>소속</th><td>${escapeHtml(personDept || "-")}</td></tr>
+                  <tr><th>성명</th><td>${escapeHtml(personName || "-")}</td></tr>
+                  <tr><th>분기</th><td>${escapeHtml(latest.quarter || "-")}</td></tr>
+                  <tr><th>제출일시</th><td>${formatDateTime(latest.submittedAt)}</td></tr>
+                </tbody>
+              </table>
+            </section>
+            <section class="ar-panel">
+              <h3>채점 요약</h3>
+              <div class="ar-score-box">
+                <div class="ar-score"><div class="label">총 문항</div><div class="value">${totalCount}</div></div>
+                <div class="ar-score"><div class="label">점수</div><div class="value">${latest.percentageScore}점</div></div>
+                <div class="ar-score"><div class="label">결과</div><div class="value ${latest.passed && !latest.disqualified ? 'good' : 'bad'}">${escapeHtml(passText)}</div></div>
+                <div class="ar-score"><div class="label">정답</div><div class="value good">${correctCount}</div></div>
+                <div class="ar-score"><div class="label">오답/미응답</div><div class="value bad">${wrongCount}/${unansweredCount}</div></div>
+              </div>
+            </section>
+          </div>
+          <div class="ar-list">${cards}</div>
         </div>
       </section>
     </div>`;
 }
-
 function _buildUserRowsHtml(rows) {
   // 중복 제거: employeeId 기준
   const seen = new Set();
