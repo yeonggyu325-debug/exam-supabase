@@ -2452,40 +2452,17 @@ function getResultComment(result) {
 
 // ※ 데모용 메모리 데이터입니다. 실제 운영에서는 서버 인증, DB 저장, 감사 로그 저장으로 교체해야 합니다.
 
-let users = [
-  { employeeId: "U-202606220001", department: "생산기술",     name: "김민준", role: "candidate" },
-  { employeeId: "U-202606220002", department: "생산기술",     name: "이서연", role: "candidate" },
-  { employeeId: "U-202606220003", department: "신기술개발",   name: "박도윤", role: "candidate" },
-  { employeeId: "U-202606220004", department: "신기술개발",   name: "최지우", role: "candidate" },
-  { employeeId: "U-202606220005", department: "연구소",       name: "정하준", role: "candidate" },
-  { employeeId: "U-202606220006", department: "연구소",       name: "강서준", role: "candidate" },
-  { employeeId: "U-202606220007", department: "공정기술",     name: "윤하린", role: "candidate" },
-  { employeeId: "U-202606220008", department: "공정기술",     name: "장유진", role: "candidate" },
-  { employeeId: "U-202606220009", department: "고객기술지원", name: "한지민", role: "candidate" },
-  { employeeId: "U-202606220010", department: "고객기술지원", name: "오시우", role: "candidate" },
-  { employeeId: "U-202606220011", department: "바른중량",     name: "임수아", role: "candidate" },
-  { employeeId: "U-202606220012", department: "대한수출포장", name: "서도현", role: "candidate" },
-  { employeeId: "ADM-0001",      department: "환경안전",     name: "ehs1985", role: "admin" }
-];
+let users = [];
 
-let managedAffiliations = [
-  { name: "생산기술",   type: "이루자" },
-  { name: "신기술개발", type: "이루자" },
-  { name: "연구소",     type: "이루자" },
-  { name: "공정기술",   type: "이루자" },
-  { name: "고객기술지원", type: "이루자" },
-  { name: "바른중량",   type: "협력사" },
-  { name: "대한수출포장", type: "협력사" }
-];
-
+let managedAffiliations = [];
 
 let questionBank = [];
 
 let examSettings = {
-  totalQuestions: 7,
-  timeLimitMinutes: 20,
+  totalQuestions: 20  ,
+  timeLimitMinutes: 30,
   passingScore: 60,
-  pointsPerQuestion: 1,
+  pointsPerQuestion: 5,
   randomizeQuestions: true,
   randomizeOptions: true,
   tabSwitchLimit: 3,
