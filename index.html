@@ -3,6 +3,14 @@
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <meta http-equiv="Content-Security-Policy"
+        content="
+          default-src 'self';
+          script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com;
+          connect-src 'self' https://wbepxouggbdzebqpndzq.supabase.co;
+          style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+          img-src 'self' data: https:;
+        "/>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net"/>
   <title>안전담당자 자격인증제</title>
@@ -1435,6 +1443,14 @@ tr:last-child td { border-bottom: 0; }
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const { createClient } = window.supabase;
+const sb = createClient(
+  'https://wbepxouggbdzebqpndzq.supabase.co',
+  'YOUR_ANON_KEY',
+  { auth: { detectSessionInUrl: false } }
+);
+
+console.log('supabase loaded', !!window.supabase, !!sb);
 /* ── js/utils.js ── */
 "use strict";
 
@@ -1726,7 +1742,13 @@ async function _sbGetAppData() {
   const s = settingsRes.data || {};
 
   return {
-    users: usersRes.data || [],
+    users: (usersRes.data || []).map((u) => ({
+      employeeId: u.employee_id ?? u.employeeId ?? "",
+      department: u.department ?? "",
+      name: u.name ?? "",
+      phone: u.phone ?? "",
+      role: u.role ?? "candidate"
+    })),
     questionBank: (qbRes.data || []).map((q) => ({
       id: q.id,
       category: q.category,
@@ -1746,7 +1768,25 @@ async function _sbGetAppData() {
       categoryQuota: s.category_quota || {}
     },
     examResults: (resultsRes.data || []).map(_fromExamResultRow),
-    activityLogs: logsRes.data || [],
+    activityLogs: (logsRes.data || []).map((l) => {
+      let detail = {};
+      try {
+        detail = typeof l.detail === "string" ? JSON.parse(l.detail || "{}") : (l.detail || {});
+      } catch (e) {
+        detail = {};
+      }
+      return {
+        logId: detail.logId ?? l.log_id,
+        employeeId: detail.employeeId ?? l.employee_id,
+        department: detail.department ?? "",
+        name: detail.name ?? "",
+        type: detail.type ?? l.action ?? "",
+        message: detail.message ?? "",
+        tabSwitchCount: detail.tabSwitchCount ?? 0,
+        createdAt: detail.createdAt ?? l.created_at,
+        ...detail
+      };
+    }),
     activeExams: (activeRes.data || []).map((a) => ({ key: a.key, ...(a.snapshot || {}) })),
     managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" }))
   };
@@ -1768,35 +1808,32 @@ async function _sbSaveAppData(snapshot) {
     }
 
     if (Array.isArray(snapshot.questionBank) && snapshot.questionBank.length) {
-      if (Array.isArray(snapshot.questionBank) && snapshot.questionBank.length) {
-  const rows = snapshot.questionBank.map((q) => ({
-    id: q.id ?? null,
-    category: q.category || "",
-    difficulty: q.difficulty || "기본",
-    text: q.text || "",
-    option_1: (q.options || [])[0] || "",
-    option_2: (q.options || [])[1] || "",
-    option_3: (q.options || [])[2] || "",
-    option_4: (q.options || [])[3] || "",
-    option_5: (q.options || [])[4] || "",
-    answer_index: q.answerIndex ?? 0,
-    active: q.active !== false
-  }));
+      const rows = snapshot.questionBank.map((q) => ({
+        id: q.id ?? null,
+        category: q.category || "",
+        text: q.text || "",
+        option_1: (q.options || [])[0] || "",
+        option_2: (q.options || [])[1] || "",
+        option_3: (q.options || [])[2] || "",
+        option_4: (q.options || [])[3] || "",
+        option_5: (q.options || [])[4] || "",
+        answer_index: q.answerIndex ?? 0,
+        active: q.active !== false
+      }));
 
-  const existing = rows.filter((r) => r.id !== null && r.id !== undefined && r.id !== "");
-  const fresh = rows.filter((r) => r.id === null || r.id === undefined || r.id === "");
+      const existing = rows.filter((r) => r.id !== null && r.id !== undefined && r.id !== "");
+      const fresh = rows.filter((r) => r.id === null || r.id === undefined || r.id === "");
 
-  if (existing.length) {
-    const { error } = await _sb.from("question_bank").upsert(existing, { onConflict: "id" });
-    if (error) throw error;
-  }
+      if (existing.length) {
+        const { error } = await _sb.from("question_bank").upsert(existing, { onConflict: "id" });
+        if (error) throw error;
+      }
 
-  if (fresh.length) {
-    const insertRows = fresh.map(({ id, ...rest }) => rest);
-    const { error } = await _sb.from("question_bank").insert(insertRows);
-    if (error) throw error;
-  }
-}
+      if (fresh.length) {
+        const insertRows = fresh.map(({ id, ...rest }) => rest);
+        const { error } = await _sb.from("question_bank").insert(insertRows);
+        if (error) throw error;
+      }
     }
     
 
@@ -1829,18 +1866,34 @@ async function _sbSaveAppData(snapshot) {
       }
     }
 
-    // activeExams(진행 중 시험) 전체 스냅샷 동기화
-    // 이걸 안 하면 관리자가 응시자 초기화를 눌러도 서버 active_exams 테이블에는
-    // 예전 진행 중 기록이 그대로 남아 있다가 새로고침 시 다시 살아나는 문제가 생김.
+
     if (Array.isArray(snapshot.activeExams)) {
-      await _sb.from("active_exams").delete().neq("key", "");
+      const { error: activeDeleteError } = await _sb.from("active_exams").delete().not("key", "is", null);
+      if (activeDeleteError) throw activeDeleteError;
       if (snapshot.activeExams.length) {
-        await _sb.from("active_exams").insert(
+        const { error: activeInsertError } = await _sb.from("active_exams").insert(
           snapshot.activeExams.map((a) => {
-            const { key, ...rest } = a;
+            const { key, ...rest } = a || {};
             return { key, snapshot: rest };
           })
         );
+        if (activeInsertError) throw activeInsertError;
+      }
+    }
+
+    if (Array.isArray(snapshot.activityLogs)) {
+      const { error: logsDeleteError } = await _sb.from("activity_logs").delete().not("log_id", "is", null);
+      if (logsDeleteError) throw logsDeleteError;
+      if (snapshot.activityLogs.length) {
+        const { error: logsInsertError } = await _sb.from("activity_logs").insert(
+          snapshot.activityLogs.map((l) => ({
+            log_id: l.logId,
+            employee_id: l.employeeId,
+            action: l.type,
+            detail: JSON.stringify(l)
+          }))
+        );
+        if (logsInsertError) throw logsInsertError;
       }
     }
 
@@ -2850,7 +2903,6 @@ function generateExamQuestions() {
     return {
       questionId: question.id,
       category: question.category,
-      difficulty: question.difficulty,
       text: question.text,
       options: displayOptions.map(option => option.text),
       correctDisplayIndex
@@ -3709,16 +3761,11 @@ function renderAdminHome() {
         <div class="section-head"><h3>최근 응시 기록</h3></div>
         <div class="recent-list">
           ${recent.map(r => `
-            <div class="recent-item">
-              <div>
-                <strong>${escapeHtml(r.name)}</strong>
-                <span class="muted">${escapeHtml(r.department)} · ${escapeHtml(r.quarter)}</span>
-              </div>
-              <div class="recent-meta">
-                <span>${formatDateOnly(r.submittedAt)}</span>
-                <strong>${r.percentageScore}점</strong>
-                ${renderResultBadge(r)}
-              </div>
+            <div class="recent-item" style="padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:12px">
+              <span class="muted">${escapeHtml(r.department)}</span>
+              <strong style="font-weight:800">${escapeHtml(r.name)}</strong>
+              <span>${r.percentageScore}점</span>
+              <span>${r.disqualified ? "실격" : (r.passed ? "합격" : "불합격")}</span>
             </div>
           `).join("") || `<div class="empty">최근 응시 기록이 없습니다.</div>`}
         </div>
@@ -3868,8 +3915,8 @@ function _sortUsers(rows) {
   });
 }
 function _getUserType(user) {
-  const affil = managedAffiliations.find(a => a && a.name === user.department);
-  return affil ? (affil.type || "이루자") : "이루자";
+  const affil = managedAffiliations.find(a => (typeof a === "string" ? a : a.name) === user.department);
+  return affil ? (typeof affil === "string" ? "이루자" : affil.type) : "이루자";
 }
 
 function _buildUserRowsHtml(rows) {
@@ -4076,8 +4123,8 @@ function filterUsers() {
     const keyword        = (state.filters.userSearch || "").trim();
     const attempted      = hasAttemptedThisQuarter(user.employeeId);
     const isExamActive   = !!getActiveExamRecord(user.employeeId);
-    const affil          = managedAffiliations.find(a => a && a.name === user.department);
-    const userType       = affil ? (affil.type || "이루자") : "이루자";
+    const affil          = managedAffiliations.find(a => (typeof a==="string"?a:a.name) === user.department);
+    const userType       = affil ? (typeof affil==="string" ? "이루자" : affil.type) : "이루자";
     const matchesKeyword = !keyword || keywordMatch(user.department, keyword) || keywordMatch(user.name, keyword);
     const matchesType    = state.filters.userType === "전체" || userType === state.filters.userType;
     const matchesDept    = state.filters.userDepartment === "전체" || user.department === state.filters.userDepartment;
@@ -4201,29 +4248,25 @@ function resetCandidateRecords(employeeId) {
   const user = users.find(item => item.employeeId === employeeId);
   if (!user) return;
   if (!confirm(`${user.department} ${user.name}의 응시 기록을 초기화하시겠습니까?`)) return;
-
-  examResults  = examResults.filter(result => result.employeeId !== employeeId);
+  examResults = examResults.filter(result => result.employeeId !== employeeId);
   activityLogs = activityLogs.filter(log => log.employeeId !== employeeId);
-  // key 형식은 `employeeId__quarter` 이므로 employeeId 부분이 정확히 일치하는 것만 제거
-  activeExams  = activeExams.filter(a => !(a.key && a.key.split('__')[0] === employeeId));
-
+  activeExams = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
   // localStorage 즉시 전체 덮어쓰기
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations }));
-  } catch (e) { console.warn('로컬 저장 실패', e); }
-
-  // 서버(Supabase)에도 초기화 반영, 실패 시 사용자에게 명확히 알림
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })); } catch(e) {}
+  // GAS에도 전체 스냅샷 저장 (merge 없이 덮어쓰도록 강제)
   if (isExternalApiRuntime()) {
     callExternalApi('saveAppData', { users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })
-      .then(() => alert(`${user.department} ${user.name}의 응시 기록이 초기화되었습니다.`))
+      .then(res => {
+        if (res && res.ok === false) throw new Error(res.message || '저장 실패');
+        alert("응시 기록 초기화가 저장되었습니다.");
+      })
       .catch(e => {
-        console.warn('서버 저장 실패', e);
-        alert('서버 저장에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해주세요.');
+        console.warn('저장 실패', e);
+        alert("응시 기록 초기화 저장에 실패했습니다: " + e.message);
       });
   } else {
-    alert(`${user.department} ${user.name}의 응시 기록이 초기화되었습니다.`);
+    alert("응시 기록 초기화가 저장되었습니다.");
   }
-
   renderAdminDashboard();
 }
 
@@ -4234,9 +4277,22 @@ function deleteCandidate(employeeId) {
   users        = users.filter(item => item.employeeId !== employeeId);
   examResults  = examResults.filter(r => r.employeeId !== employeeId);
   activityLogs = activityLogs.filter(l => l.employeeId !== employeeId);
-  activeExams  = activeExams.filter(a => !a.key?.startsWith(employeeId + '_'));
+  activeExams  = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
   if (state.currentUser?.employeeId === employeeId) logout();
-  savePersistentData();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })); } catch(e) { console.warn("localStorage save failed", e); }
+  if (isExternalApiRuntime()) {
+    callExternalApi('saveAppData', { users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })
+      .then(res => {
+        if (res && res.ok === false) throw new Error(res.message || '저장 실패');
+        alert("응시자 삭제가 저장되었습니다.");
+      })
+      .catch(e => {
+        console.warn('저장 실패', e);
+        alert("응시자 삭제 저장에 실패했습니다: " + e.message);
+      });
+  } else {
+    alert("응시자 삭제가 저장되었습니다.");
+  }
   renderAdminDashboard();
 }
 
