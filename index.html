@@ -1443,14 +1443,6 @@ tr:last-child td { border-bottom: 0; }
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const { createClient } = window.supabase;
-const sb = createClient(
-  'https://wbepxouggbdzebqpndzq.supabase.co',
-  'YOUR_ANON_KEY',
-  { auth: { detectSessionInUrl: false } }
-);
-
-console.log('supabase loaded', !!window.supabase, !!sb);
 /* ── js/utils.js ── */
 "use strict";
 
@@ -1548,6 +1540,25 @@ function shuffleArray(array) {
 
 function nextId(array, key) {
   return array.length ? Math.max(...array.map(item => Number(item[key]) || 0)) + 1 : 1;
+}
+
+function makeResultId(employeeId, quarter) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return String(employeeId || "") + "_" + String(quarter || "") + "_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+}
+
+function makeLogId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "log_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+}
+
+function normalizeManagedAffiliations(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((a) => typeof a === "string"
+      ? { name: a, type: "이루자" }
+      : { name: a?.name || "", type: a?.type || "이루자" }
+    )
+    .filter((a) => a.name);
 }
 
 function optionHtml(value, selected, label = value) {
@@ -1655,7 +1666,7 @@ function mergeLocalActiveExams() {
       if (!localRecord?.key || localRecord.status !== "in_progress") return;
       // 초기화된 응시자 감지: 서버 examResults에 해당 employeeId 기록이 없고
       // 서버 activeExams에도 없으면 → 관리자가 초기화한 것으로 판단, 로컬 것 무시
-      const empId = localRecord.employeeId || localRecord.key?.split("_")[0];
+      const empId = localRecord.employeeId || localRecord.key?.split("__")[0];
       const quarter = getCurrentQuarter();
       const serverHasResult = examResults.some(r => r.employeeId === empId);
       const serverHasActive = activeExams.some(a => a.key === localRecord.key);
@@ -1743,11 +1754,11 @@ async function _sbGetAppData() {
 
   return {
     users: (usersRes.data || []).map((u) => ({
-      employeeId: u.employee_id ?? u.employeeId ?? "",
-      department: u.department ?? "",
-      name: u.name ?? "",
-      phone: u.phone ?? "",
-      role: u.role ?? "candidate"
+      employeeId: u.employee_id,
+      department: u.department || "",
+      name: u.name || "",
+      phone: u.phone || "",
+      role: u.role || "candidate"
     })),
     questionBank: (qbRes.data || []).map((q) => ({
       id: q.id,
@@ -1771,20 +1782,22 @@ async function _sbGetAppData() {
     activityLogs: (logsRes.data || []).map((l) => {
       let detail = {};
       try {
-        detail = typeof l.detail === "string" ? JSON.parse(l.detail || "{}") : (l.detail || {});
+        detail = l.detail ? JSON.parse(l.detail) : {};
       } catch (e) {
         detail = {};
       }
+
+      const user = (usersRes.data || []).find((u) => u.employee_id === l.employee_id);
+
       return {
-        logId: detail.logId ?? l.log_id,
-        employeeId: detail.employeeId ?? l.employee_id,
-        department: detail.department ?? "",
-        name: detail.name ?? "",
-        type: detail.type ?? l.action ?? "",
-        message: detail.message ?? "",
-        tabSwitchCount: detail.tabSwitchCount ?? 0,
-        createdAt: detail.createdAt ?? l.created_at,
-        ...detail
+        logId: detail.logId || l.log_id,
+        employeeId: l.employee_id,
+        department: detail.department || user?.department || "",
+        name: detail.name || user?.name || "",
+        type: detail.type || detail.action || l.action || "",
+        message: detail.message || detail.detail || "",
+        tabSwitchCount: detail.tabSwitchCount || 0,
+        createdAt: detail.createdAt || l.created_at
       };
     }),
     activeExams: (activeRes.data || []).map((a) => ({ key: a.key, ...(a.snapshot || {}) })),
@@ -1795,7 +1808,7 @@ async function _sbGetAppData() {
 async function _sbSaveAppData(snapshot) {
   try {
     if (Array.isArray(snapshot.users) && snapshot.users.length) {
-      await _sb.from("users").upsert(
+      const { error } = await _sb.from("users").upsert(
         snapshot.users.map((u) => ({
           employee_id: u.employeeId,
           department: u.department || "",
@@ -1805,6 +1818,7 @@ async function _sbSaveAppData(snapshot) {
         })),
         { onConflict: "employee_id" }
       );
+      if (error) throw error;
     }
 
     if (Array.isArray(snapshot.questionBank) && snapshot.questionBank.length) {
@@ -1835,11 +1849,10 @@ async function _sbSaveAppData(snapshot) {
         if (error) throw error;
       }
     }
-    
 
     if (snapshot.examSettings) {
       const s = snapshot.examSettings;
-      await _sb.from("exam_settings").upsert(
+      const { error } = await _sb.from("exam_settings").upsert(
         {
           id: 1,
           total_questions: s.totalQuestions,
@@ -1853,67 +1866,96 @@ async function _sbSaveAppData(snapshot) {
         },
         { onConflict: "id" }
       );
+      if (error) throw error;
     }
 
     if (Array.isArray(snapshot.managedAffiliations)) {
-      await _sb.from("affiliations").delete().neq("name", "");
-      if (snapshot.managedAffiliations.length) {
-        await _sb.from("affiliations").insert(
-          snapshot.managedAffiliations.map((a) =>
-            typeof a === "string" ? { name: a, type: "이루자" } : { name: a.name, type: a.type || "이루자" }
-          )
-        );
+      const affiliations = normalizeManagedAffiliations(snapshot.managedAffiliations);
+      const { error: delError } = await _sb.from("affiliations").delete().neq("name", "");
+      if (delError) throw delError;
+
+      if (affiliations.length) {
+        const { error } = await _sb.from("affiliations").insert(affiliations);
+        if (error) throw error;
       }
     }
 
-
     if (Array.isArray(snapshot.activeExams)) {
-      const { error: activeDeleteError } = await _sb.from("active_exams").delete().not("key", "is", null);
-      if (activeDeleteError) throw activeDeleteError;
+      const { error: delError } = await _sb.from("active_exams").delete().neq("key", "");
+      if (delError) throw delError;
+
       if (snapshot.activeExams.length) {
-        const { error: activeInsertError } = await _sb.from("active_exams").insert(
-          snapshot.activeExams.map((a) => {
-            const { key, ...rest } = a || {};
-            return { key, snapshot: rest };
-          })
+        const { error } = await _sb.from("active_exams").insert(
+          snapshot.activeExams.map(({ key, ...rest }) => ({
+            key,
+            employee_id: rest.employeeId || key?.split("__")?.[0] || "",
+            quarter: rest.quarter || key?.split("__")?.[1] || "",
+            snapshot: rest
+          }))
         );
-        if (activeInsertError) throw activeInsertError;
+        if (error) throw error;
       }
     }
 
     if (Array.isArray(snapshot.activityLogs)) {
-      const { error: logsDeleteError } = await _sb.from("activity_logs").delete().not("log_id", "is", null);
-      if (logsDeleteError) throw logsDeleteError;
+      const { error: delError } = await _sb.from("activity_logs").delete().neq("log_id", "");
+      if (delError) throw delError;
+
       if (snapshot.activityLogs.length) {
-        const { error: logsInsertError } = await _sb.from("activity_logs").insert(
+        const { error } = await _sb.from("activity_logs").insert(
           snapshot.activityLogs.map((l) => ({
-            log_id: l.logId,
-            employee_id: l.employeeId,
-            action: l.type,
+            log_id: String(l.logId || makeLogId()),
+            employee_id: l.employeeId || "",
+            action: l.type || l.action || "",
             detail: JSON.stringify(l)
           }))
         );
-        if (logsInsertError) throw logsInsertError;
+        if (error) throw error;
       }
     }
 
     return { ok: true, retry: false };
   } catch (err) {
-    return { ok: false, retry: false, message: err.message };
+    throw err;
   }
 }
 
 async function _sbAppendExamSubmission(result, log) {
   try {
-    const { data: existing } = await _sb
+    const { data: existing, error: existingError } = await _sb
       .from("exam_results")
       .select("result_id")
-      .eq("result_id", result.resultId)
+      .eq("employee_id", result.employeeId)
+      .eq("quarter", result.quarter)
       .maybeSingle();
 
-    if (existing) return { ok: true, duplicate: true, message: "이미 기록된 결과입니다." };
+    if (existingError) throw existingError;
 
-    await _sb.from("exam_results").insert({
+    if (existing) {
+      const now = new Date().toISOString();
+      const logId = makeLogId();
+      const duplicateLog = {
+        log_id: logId,
+        employee_id: result.employeeId,
+        action: "SUBMIT_SKIPPED_DUPLICATE",
+        detail: JSON.stringify({
+          logId,
+          employeeId: result.employeeId,
+          department: result.department || "",
+          name: result.name || "",
+          type: "SUBMIT_SKIPPED_DUPLICATE",
+          message: "이미 같은 분기에 제출한 결과가 있어 중복 제출을 저장하지 않았습니다.",
+          createdAt: now
+        })
+      };
+
+      const { error: dupLogError } = await _sb.from("activity_logs").insert(duplicateLog);
+      if (dupLogError) console.warn("중복 제출 로그 저장 실패", dupLogError);
+
+      return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
+    }
+
+    const { error: insertError } = await _sb.from("exam_results").insert({
       result_id: result.resultId,
       employee_id: result.employeeId,
       department: result.department || "",
@@ -1929,22 +1971,68 @@ async function _sbAppendExamSubmission(result, log) {
       started_at: result.startedAt || null,
       submitted_at: result.submittedAt || null
     });
+    if (insertError) throw insertError;
 
     if (log) {
-      await _sb.from("activity_logs").insert({
-        log_id: log.logId || crypto.randomUUID(),
+      const { error: logError } = await _sb.from("activity_logs").insert({
+        log_id: String(log.logId || makeLogId()),
         employee_id: result.employeeId,
-        action: log.action || "exam_submit",
+        action: log.type || log.action || "exam_submit",
         detail: JSON.stringify(log)
       });
+      if (logError) throw logError;
     }
 
     const key = result.employeeId + "__" + result.quarter;
-    await _sb.from("active_exams").delete().eq("key", key);
+    const { error: activeDeleteError } = await _sb.from("active_exams").delete().eq("key", key);
+    if (activeDeleteError) throw activeDeleteError;
 
     return { ok: true };
   } catch (err) {
-    return { ok: false, message: err.message };
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
+async function _sbResetCandidateData(employeeId) {
+  try {
+    if (!employeeId) throw new Error("employeeId가 없습니다.");
+
+    const { error: resultsError } = await _sb.from("exam_results").delete().eq("employee_id", employeeId);
+    if (resultsError) throw resultsError;
+
+    const { error: logsError } = await _sb.from("activity_logs").delete().eq("employee_id", employeeId);
+    if (logsError) throw logsError;
+
+    const { error: activeError } = await _sb.from("active_exams").delete().like("key", employeeId + "__%");
+    if (activeError) throw activeError;
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
+async function _sbDeleteCandidateData(employeeId) {
+  try {
+    const reset = await _sbResetCandidateData(employeeId);
+    if (!reset.ok) throw new Error(reset.message || "응시자 데이터 삭제 실패");
+
+    const { error: userError } = await _sb.from("users").delete().eq("employee_id", employeeId);
+    if (userError) throw userError;
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
+async function _sbDeleteQuestionData(id) {
+  try {
+    const { error } = await _sb.from("question_bank").delete().eq("id", id);
+    if (error) throw error;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
   }
 }
 
@@ -1988,6 +2076,15 @@ async function callExternalApi(action, payload = {}) {
     case "appendExamSubmission":
       result = { ok: true, data: await _sbAppendExamSubmission(payload.result, payload.log) };
       break;
+    case "resetCandidateData":
+      result = { ok: true, data: await _sbResetCandidateData(payload.employeeId || payload) };
+      break;
+    case "deleteCandidateData":
+      result = { ok: true, data: await _sbDeleteCandidateData(payload.employeeId || payload) };
+      break;
+    case "deleteQuestionData":
+      result = { ok: true, data: await _sbDeleteQuestionData(payload.id ?? payload) };
+      break;
     case "adminLogin":
       result = { ok: true, data: await _sbAdminLogin(payload) };
       break;
@@ -2010,9 +2107,7 @@ function applyRemoteData(data) {
   if (data && Array.isArray(data.activityLogs)) activityLogs = data.activityLogs;
   if (data && Array.isArray(data.activeExams)) activeExams = data.activeExams;
   if (data && Array.isArray(data.managedAffiliations)) {
-    managedAffiliations = data.managedAffiliations.map(a =>
-      typeof a === 'string' ? { name: a, type: '이루자' } : a
-    );
+    managedAffiliations = normalizeManagedAffiliations(data.managedAffiliations);
   }
   // 시험 진행 중인 응시자만 로컬 activeExam 병합 (초기화된 응시자는 제외)
   mergeLocalActiveExams();
@@ -2107,26 +2202,97 @@ function _retryRemoteSave() {
   setTimeout(() => _doRemoteSave(), delay);
 }
 
-function appendResultToSheet(result, log) {
-  if (isAppsScriptRuntime()) {
-    google.script.run
-      .withFailureHandler(error => console.warn("응시 결과 스프레드시트 기록에 실패했습니다.", error))
-      .appendExamSubmission(result, log);
-    return;
+function getPendingSubmissionKey(employeeId, quarter) {
+  return "pending_submission_" + employeeId + "_" + quarter;
+}
+
+function savePendingSubmission(result, log) {
+  try {
+    localStorage.setItem(
+      getPendingSubmissionKey(result.employeeId, result.quarter),
+      JSON.stringify({ result, log, savedAt: new Date().toISOString() })
+    );
+  } catch (e) {
+    console.warn("pending 제출 저장 실패", e);
   }
+}
+
+async function retryPendingSubmissions(employeeId = "") {
+  const keys = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("pending_submission_")) continue;
+      if (employeeId && !key.startsWith("pending_submission_" + employeeId + "_")) continue;
+      keys.push(key);
+    }
+
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const pending = JSON.parse(raw);
+      const res = await _sendExamSubmissionOnce(pending.result, pending.log);
+      if (res?.ok) localStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn("pending 제출 재전송 실패", e);
+  }
+}
+
+async function _sendExamSubmissionOnce(result, log) {
+  if (isAppsScriptRuntime()) {
+    return await new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler((res) => resolve(res || { ok: true }))
+        .withFailureHandler(reject)
+        .appendExamSubmission(result, log);
+    });
+  }
+
   if (isExternalApiRuntime()) {
-    callExternalApi("appendExamSubmission", { result, log })
-      .catch(error => console.warn("응시 결과 외부 API 기록에 실패했습니다.", error));
+    return await callExternalApi("appendExamSubmission", { result, log });
+  }
+
+  return { ok: true, localOnly: true };
+}
+
+async function appendResultToSheet(result, log) {
+  const delays = [1000, 2000, 4000];
+
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      const res = await _sendExamSubmissionOnce(result, log);
+      if (res?.ok === false) throw new Error(res.message || "제출 저장 실패");
+
+      try {
+        localStorage.removeItem(getPendingSubmissionKey(result.employeeId, result.quarter));
+      } catch (e) {}
+
+      return { ok: true, duplicate: !!res?.duplicate };
+    } catch (error) {
+      console.warn("응시 결과 저장 실패 " + (attempt + 1) + "회", error);
+      if (attempt >= delays.length) {
+        savePendingSubmission(result, log);
+        return {
+          ok: false,
+          pending: true,
+          message: "제출이 지연되고 있습니다. 네트워크 연결 후 재접속하면 자동 재전송됩니다."
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
   }
 }
 
 function getAffiliations() {
-  return managedAffiliations || [];
+  managedAffiliations = normalizeManagedAffiliations(managedAffiliations);
+  return managedAffiliations;
 }
 
 function affiliationOptions(selected = "") {
-  const iruja = managedAffiliations.filter(a => a.type === "이루자");
-  const partner = managedAffiliations.filter(a => a.type === "협력사");
+  const affiliations = getAffiliations();
+  const iruja = affiliations.filter(a => a.type === "이루자");
+  const partner = affiliations.filter(a => a.type === "협력사");
   let html = "";
   if (iruja.length) {
     html += `<optgroup label="이루자">${iruja.map(a => optionHtml(a.name, selected)).join("")}</optgroup>`;
@@ -2161,9 +2327,7 @@ function loadPersistentData() {
     if (Array.isArray(data.activityLogs)) activityLogs = data.activityLogs;
     if (Array.isArray(data.activeExams)) activeExams = data.activeExams;
     if (Array.isArray(data.managedAffiliations)) {
-      managedAffiliations = data.managedAffiliations.map(a =>
-        typeof a === 'string' ? { name: a, type: '이루자' } : a
-      );
+      managedAffiliations = normalizeManagedAffiliations(data.managedAffiliations);
     }
     return true;
   } catch (error) {
@@ -2559,15 +2723,10 @@ function updateLoginDepartments(type) {
     sel.disabled = true;
     return;
   }
-  const list = managedAffiliations.filter(a =>
-    (typeof a === "string" ? "이루자" : a.type) === type
-  );
+  const list = getAffiliations().filter(a => a.type === type);
   sel.disabled = false;
   sel.innerHTML = `<option value="" hidden disabled selected>소속을 선택하세요</option>` +
-    list.map(a => {
-      const name = typeof a === "string" ? a : a.name;
-      return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
-    }).join("");
+    list.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join("");
 }
 
 function handleLogin(event) {
@@ -2584,6 +2743,7 @@ function handleLogin(event) {
     state.view        = "admin";
     state.loginError  = "";
     state.isTestMode  = false;
+    retryPendingSubmissions();
     render();
     return;
   }
@@ -2609,6 +2769,7 @@ function handleLogin(event) {
   if (candidate) {
     state.currentUser = candidate;
     state.loginError  = "";
+    retryPendingSubmissions(candidate.employeeId);
     // 로컬 데이터로 즉시 화면 결정 (빠른 진입)
     function _resolveLoginView() {
       const currentQuarterResult = examResults
@@ -2947,7 +3108,7 @@ function handlePreExamVisibility() {
     if (!user) return;
     const createdAt = new Date().toISOString();
     activityLogs.push({
-      logId: nextId(activityLogs, "logId"),
+      logId: makeLogId(),
       employeeId: user.employeeId,
       department: user.department,
       name: user.name,
@@ -3069,7 +3230,7 @@ function registerExamExitViolation(source = "exit") {
     : `페이지 이탈 ${count}회 감지: 재접속 후 누적됩니다.`;
   state.currentExam.warningLogs.push({ at: createdAt, source, message });
   activityLogs.push({
-    logId: nextId(activityLogs, "logId"),
+    logId: makeLogId(),
     employeeId: state.currentUser.employeeId,
     department: state.currentUser.department,
     name: state.currentUser.name,
@@ -3101,7 +3262,7 @@ function handleTabSwitchViolation(source = "unknown") {
   const createdAt = new Date().toISOString();
   state.currentExam.warningLogs.push({ at: createdAt, source, message });
   activityLogs.push({
-    logId: nextId(activityLogs, "logId"),
+    logId: makeLogId(),
     employeeId: state.currentUser.employeeId,
     department: state.currentUser.department,
     name: state.currentUser.name,
@@ -3327,7 +3488,7 @@ function calculateScore(exam) {
   }
 }
 
-function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessage = "시험 제출 완료") {
+async function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessage = "시험 제출 완료") {
   // §7: 프론트 중복 제출 방지
   if (!state.currentExam || state.isSubmitting) return;
   state.isSubmitting = true;
@@ -3357,7 +3518,7 @@ function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessa
 
   const scoring = calculateScore(state.currentExam);
   const result  = {
-    resultId: nextId(examResults, "resultId"),
+    resultId: makeResultId(state.currentUser.employeeId, state.currentExam.quarter),
     employeeId: state.currentUser.employeeId,
     department: state.currentUser.department,
     name: state.currentUser.name,
@@ -3384,7 +3545,7 @@ function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessa
   }
 
   const submitLog = {
-    logId: nextId(activityLogs, "logId"),
+    logId: makeLogId(),
     employeeId: state.currentUser.employeeId,
     department: state.currentUser.department,
     name: state.currentUser.name,
@@ -3399,7 +3560,10 @@ function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessa
     activityLogs.push(submitLog);
     clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
     savePersistentData();
-    appendResultToSheet(result, submitLog);
+    const saveResult = await appendResultToSheet(result, submitLog);
+    if (!saveResult.ok && saveResult.pending) {
+      alert(saveResult.message);
+    }
     // §6: 제출 완료 후 localStorage 임시 답안 삭제
     try { localStorage.removeItem("exam_answers_" + result.employeeId); } catch(e) {}
   }
@@ -3416,25 +3580,19 @@ function renderResultScreen() {
   clearTimer();
   removeExamGuards();
   clearIntroCountdown();
-  // 서버 동기화 완료 후라면 최신 examResults 기준으로 재확인
-  if (state.currentUser) {
-    const empId = state.currentUser.employeeId;
-    const serverResult = examResults.find(r =>
-      r.employeeId === empId && r.quarter === getCurrentQuarter()
-    );
-    if (!serverResult && !state.lastResult) {
-      state.view = "candidate";
-      renderCandidateDashboard();
-      return;
-    }
-    if (serverResult) state.lastResult = serverResult;
-  }
-  const result = state.lastResult || getLatestResult(state.currentUser?.employeeId);
+  const serverResult = state.currentUser
+    ? examResults
+        .filter((r) => r.employeeId === state.currentUser.employeeId && r.quarter === getCurrentQuarter())
+        .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0]
+    : null;
+
+  const result = state.lastResult || serverResult;
   if (!result) {
     state.view = "candidate";
     renderCandidateDashboard();
     return;
   }
+  if (serverResult && !state.lastResult) state.lastResult = serverResult;
   const passed   = result.passed && !result.disqualified;
   const label    = result.disqualified ? "실격" : (passed ? "합격" : "불합격");
   const cls      = passed ? "success" : "danger";
@@ -4195,15 +4353,10 @@ function openUserModal() {
 function updateUserModalDepts(type) {
   const sel = document.getElementById("newUserDepartment");
   if (!sel) return;
-  const list = managedAffiliations.filter(a =>
-    (typeof a==="string" ? "이루자" : a.type) === type
-  );
+  const list = getAffiliations().filter(a => a.type === type);
   sel.disabled = false;
   sel.innerHTML = `<option value="" hidden disabled selected>소속을 선택하세요</option>` +
-    list.map(a => {
-      const name = typeof a==="string" ? a : a.name;
-      return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
-    }).join("");
+    list.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join("");
 }
 
 
@@ -4244,54 +4397,50 @@ function addUser(event) {
   renderAdminDashboard();
 }
 
-function resetCandidateRecords(employeeId) {
+async function resetCandidateRecords(employeeId) {
   const user = users.find(item => item.employeeId === employeeId);
   if (!user) return;
-  if (!confirm(`${user.department} ${user.name}의 응시 기록을 초기화하시겠습니까?`)) return;
+  if (!confirm(user.department + " " + user.name + "의 응시 기록을 초기화하시겠습니까?")) return;
+
   examResults = examResults.filter(result => result.employeeId !== employeeId);
   activityLogs = activityLogs.filter(log => log.employeeId !== employeeId);
   activeExams = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
-  // localStorage 즉시 전체 덮어쓰기
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })); } catch(e) {}
-  // GAS에도 전체 스냅샷 저장 (merge 없이 덮어쓰도록 강제)
-  if (isExternalApiRuntime()) {
-    callExternalApi('saveAppData', { users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })
-      .then(res => {
-        if (res && res.ok === false) throw new Error(res.message || '저장 실패');
-        alert("응시 기록 초기화가 저장되었습니다.");
-      })
-      .catch(e => {
-        console.warn('저장 실패', e);
-        alert("응시 기록 초기화 저장에 실패했습니다: " + e.message);
-      });
-  } else {
+  overwriteLocalCache();
+
+  try {
+    if (isExternalApiRuntime()) {
+      const res = await callExternalApi("resetCandidateData", { employeeId });
+      if (res && res.ok === false) throw new Error(res.message || "응시 기록 초기화 실패");
+    }
     alert("응시 기록 초기화가 저장되었습니다.");
+  } catch (e) {
+    console.warn("응시 기록 초기화 실패", e);
+    alert("응시 기록 초기화 저장에 실패했습니다: " + (e.message || e));
   }
   renderAdminDashboard();
 }
 
-function deleteCandidate(employeeId) {
+async function deleteCandidate(employeeId) {
   const user = users.find(item => item.employeeId === employeeId);
   if (!user) return;
-  if (!confirm(`${user.department} ${user.name} 응시자를 삭제할까요? 해당 응시자의 시험 결과와 로그도 함께 삭제됩니다.`)) return;
-  users        = users.filter(item => item.employeeId !== employeeId);
-  examResults  = examResults.filter(r => r.employeeId !== employeeId);
+  if (!confirm(user.department + " " + user.name + " 응시자를 삭제할까요? 해당 응시자의 시험 결과와 로그도 함께 삭제됩니다.")) return;
+
+  users = users.filter(item => item.employeeId !== employeeId);
+  examResults = examResults.filter(r => r.employeeId !== employeeId);
   activityLogs = activityLogs.filter(l => l.employeeId !== employeeId);
-  activeExams  = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
+  activeExams = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
   if (state.currentUser?.employeeId === employeeId) logout();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })); } catch(e) { console.warn("localStorage save failed", e); }
-  if (isExternalApiRuntime()) {
-    callExternalApi('saveAppData', { users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations })
-      .then(res => {
-        if (res && res.ok === false) throw new Error(res.message || '저장 실패');
-        alert("응시자 삭제가 저장되었습니다.");
-      })
-      .catch(e => {
-        console.warn('저장 실패', e);
-        alert("응시자 삭제 저장에 실패했습니다: " + e.message);
-      });
-  } else {
+  overwriteLocalCache();
+
+  try {
+    if (isExternalApiRuntime()) {
+      const res = await callExternalApi("deleteCandidateData", { employeeId });
+      if (res && res.ok === false) throw new Error(res.message || "응시자 삭제 실패");
+    }
     alert("응시자 삭제가 저장되었습니다.");
+  } catch (e) {
+    console.warn("응시자 삭제 실패", e);
+    alert("응시자 삭제 저장에 실패했습니다: " + (e.message || e));
   }
   renderAdminDashboard();
 }
@@ -4301,8 +4450,9 @@ function deleteCandidate(employeeId) {
 "use strict";
 
 function renderAffiliationManager() {
-  const iruja   = managedAffiliations.filter(a => a.type === "이루자");
-  const partner = managedAffiliations.filter(a => a.type === "협력사");
+  const affiliations = getAffiliations();
+  const iruja   = affiliations.filter(a => a.type === "이루자");
+  const partner = affiliations.filter(a => a.type === "협력사");
 
   function groupRows(list, colspan) {
     if (!list.length) return `<tr><td colspan="${colspan}" style="text-align:center;padding:16px;color:#94a3b8;font-size:13px">등록된 항목이 없습니다.</td></tr>`;
@@ -4310,7 +4460,7 @@ function renderAffiliationManager() {
       <tr>
         <td style="padding:10px 14px;font-size:14px;font-weight:600">${escapeHtml(dep.name)}</td>
         <td style="padding:10px 14px;text-align:center;font-size:14px">${users.filter(u=>u.role==="candidate"&&u.department===dep.name).length}명</td>
-        <td style="padding:10px 14px;text-align:center"><button class="btn danger small" onclick="removeAffiliation('${escapeHtml(dep.name)}')">삭제</button></td>
+        <td style="padding:10px 14px;text-align:center"><button class="btn danger small" onclick="removeAffiliation('${escapeHtml(dep.name)}','${escapeHtml(dep.type)}')">삭제</button></td>
       </tr>`).join("");
   }
 
@@ -4393,12 +4543,14 @@ function renderAffiliationManager() {
 
 function addAffiliationDirect(name, type, inputEl) {
   name = String(name || "").trim();
+  type = String(type || "이루자").trim() || "이루자";
   if (!name) return;
+  managedAffiliations = normalizeManagedAffiliations(managedAffiliations);
   if (managedAffiliations.some(a => a.name === name && a.type === type)) {
     alert("이미 등록된 소속입니다."); return;
   }
   managedAffiliations.push({ name, type });
-  managedAffiliations.sort((a, b) => a.name.localeCompare(b.name));
+  managedAffiliations.sort((a, b) => a.name.localeCompare(b.name, "ko") || a.type.localeCompare(b.type, "ko"));
   if (inputEl) inputEl.value = "";
   savePersistentData();
   renderAdminDashboard();
@@ -4409,21 +4561,23 @@ function addAffiliation(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const name = String(form.get("affiliation") || "").trim();
-  const type = String(form.get("affiliationType") || "이루자").trim();
+  const type = String(form.get("affiliationType") || "이루자").trim() || "이루자";
   if (!name) return;
+  managedAffiliations = normalizeManagedAffiliations(managedAffiliations);
   if (managedAffiliations.some(a => a.name === name && a.type === type)) {
     alert("이미 등록된 소속입니다.");
     return;
   }
   managedAffiliations.push({ name, type });
-  managedAffiliations.sort((a, b) => a.name.localeCompare(b.name));
+  managedAffiliations.sort((a, b) => a.name.localeCompare(b.name, "ko") || a.type.localeCompare(b.type, "ko"));
   savePersistentData();
   renderAdminDashboard();
 }
 
-function removeAffiliation(name) {
-  if (!confirm(`${name} 소속을 선택 목록에서 제거할까요? 기존 응시자 기록의 소속 데이터는 유지됩니다.`)) return;
-  managedAffiliations = managedAffiliations.filter(a => a.name !== name);
+function removeAffiliation(name, type = "") {
+  if (!confirm(name + " 소속을 선택 목록에서 제거할까요? 기존 응시자 기록의 소속 데이터는 유지됩니다.")) return;
+  managedAffiliations = normalizeManagedAffiliations(managedAffiliations)
+    .filter(a => !(a.name === name && (!type || a.type === type)));
   savePersistentData();
   renderAdminDashboard();
 }
@@ -4653,12 +4807,24 @@ function toggleQuestionStatus(id) {
   renderAdminDashboard();
 }
 
-function deleteQuestion(id) {
+async function deleteQuestion(id) {
   const q = questionBank.find(item => item.id === id);
   if (!q) return;
   if (!confirm("선택한 문제를 삭제할까요?")) return;
+
   questionBank = questionBank.filter(item => item.id !== id);
-  savePersistentData();
+  overwriteLocalCache();
+
+  try {
+    if (isExternalApiRuntime()) {
+      const res = await callExternalApi("deleteQuestionData", { id });
+      if (res && res.ok === false) throw new Error(res.message || "문제 삭제 실패");
+    }
+  } catch (e) {
+    console.warn("문제 삭제 실패", e);
+    alert("문제 삭제에 실패했습니다: " + (e.message || e));
+  }
+
   renderAdminDashboard();
 }
 
@@ -4981,6 +5147,7 @@ function renderLogManager() {
     function initApp() {
       _initSampleData();
       loadPersistentData();
+      retryPendingSubmissions();
 
       // F5 새로고침 시 이전 화면 복원
       let restored = false;
@@ -5035,9 +5202,9 @@ function renderLogManager() {
           // 결과 화면인 경우: 서버 데이터 기준으로 재검증
           if (state.view === "result" && state.currentUser) {
             const empId = state.currentUser.employeeId;
-            const serverResult = examResults.find(r =>
-              r.employeeId === empId && r.quarter === getCurrentQuarter()
-            );
+            const serverResult = examResults
+              .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
+              .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
             if (!serverResult) {
               // 서버에 결과 없음 = 초기화됨 → 대기 화면으로
               state.lastResult = null;
