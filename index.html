@@ -1622,7 +1622,127 @@ function getActiveExamKey(employeeId, quarter = getCurrentQuarter()) {
 
 function getActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
   const key = getActiveExamKey(employeeId, quarter);
-  return activeExams.find(item => item.key === key && item.status === "in_progress");
+  return activeExams.find(item => item.key === key && item.status !== "submitted" && item.status !== "completed" && item.status !== "done");
+}
+
+function normalizeActiveExamRecord(row) {
+  if (!row) return null;
+  const snap = row.snapshot ? JSON.parse(JSON.stringify(row.snapshot)) : JSON.parse(JSON.stringify(row));
+  const key = row.key || snap.key || getActiveExamKey(row.employee_id || snap.employeeId, row.quarter || snap.quarter || getCurrentQuarter());
+  const employeeId = snap.employeeId || row.employee_id || key.split("__")[0] || "";
+  const quarter = snap.quarter || row.quarter || key.split("__")[1] || getCurrentQuarter();
+
+  if (!snap.exam && Array.isArray(snap.questionSet)) {
+    const questions = snap.questionSet.map((q) => {
+      const source = questionBank.find((item) => String(item.id) === String(q.id || q.questionId));
+      const baseOptions = Array.isArray(source?.options) ? source.options : [];
+      const order = Array.isArray(q.optionOrder) ? q.optionOrder : baseOptions.map((_, idx) => idx + 1);
+      const options = order.map((n) => baseOptions[Number(n) - 1] || "").filter((v) => v !== "");
+      const correctOriginal = Number(source?.answerIndex ?? q.answerIndex ?? q.correctAnswerIndex ?? 0);
+      const correctDisplayIndex = Math.max(0, order.findIndex((n) => Number(n) === correctOriginal));
+      return {
+        questionId: q.id || q.questionId,
+        category: q.category || source?.category || "",
+        text: q.text || source?.text || "",
+        options,
+        correctDisplayIndex
+      };
+    });
+    const answers = Array(questions.length).fill(null);
+    const answerMap = snap.answers || {};
+    questions.forEach((q, idx) => {
+      const saved = answerMap[String(q.questionId)] ?? (Array.isArray(answerMap) ? answerMap[idx] : undefined);
+      if (saved === undefined || saved === null) return;
+      if (typeof saved === "number") answers[idx] = saved;
+      else if (typeof saved.selectedDisplayIndex === "number") answers[idx] = saved.selectedDisplayIndex;
+      else if (saved.selectedOriginalOption != null && Array.isArray(snap.questionSet?.[idx]?.optionOrder)) {
+        const displayIdx = snap.questionSet[idx].optionOrder.findIndex((n) => Number(n) === Number(saved.selectedOriginalOption));
+        if (displayIdx >= 0) answers[idx] = displayIdx;
+      }
+    });
+    snap.exam = {
+      employeeId,
+      quarter,
+      startedAt: snap.examStartedAt || snap.startedAt || row.updated_at || new Date().toISOString(),
+      questions,
+      answers,
+      currentQuestionIndex: Number(snap.currentQuestionIndex || 0),
+      tabSwitchCount: Number(snap.tabSwitchCount || 0),
+      warningLogs: snap.warningLogs || [],
+      disqualified: Boolean(snap.disqualified),
+      disqualificationReason: snap.disqualificationReason || "",
+      lastViolationAt: 0
+    };
+  }
+
+  if (snap.exam) {
+    snap.exam.employeeId = snap.exam.employeeId || employeeId;
+    snap.exam.quarter = snap.exam.quarter || quarter;
+    if (!Array.isArray(snap.exam.answers) && snap.answers && Array.isArray(snap.exam.questions)) {
+      const answers = Array(snap.exam.questions.length).fill(null);
+      snap.exam.questions.forEach((q, idx) => {
+        const saved = snap.answers[String(q.questionId)] ?? (Array.isArray(snap.answers) ? snap.answers[idx] : undefined);
+        if (typeof saved === "number") answers[idx] = saved;
+        else if (saved && typeof saved.selectedDisplayIndex === "number") answers[idx] = saved.selectedDisplayIndex;
+      });
+      snap.exam.answers = answers;
+    }
+    snap.exam.currentQuestionIndex = Number(snap.currentQuestionIndex ?? snap.exam.currentQuestionIndex ?? 0);
+  }
+
+  return {
+    key,
+    employeeId,
+    quarter,
+    status: snap.status || "in_progress",
+    updatedAt: snap.updatedAt || row.updated_at || new Date().toISOString(),
+    remainingSeconds: Number(snap.remainingSeconds ?? examSettings.timeLimitMinutes * 60),
+    currentQuestionIndex: Number(snap.currentQuestionIndex ?? snap.exam?.currentQuestionIndex ?? 0),
+    exam: snap.exam || null,
+    ...snap
+  };
+}
+
+function restoreActiveExamRecord(record) {
+  const activeRecord = normalizeActiveExamRecord(record);
+  if (!activeRecord?.exam) return false;
+  state.currentExam = activeRecord.exam;
+  const savedRemaining = Number(activeRecord.remainingSeconds || examSettings.timeLimitMinutes * 60);
+  const savedAt = activeRecord.updatedAt ? new Date(activeRecord.updatedAt).getTime() : Date.now();
+  const elapsedSecs = Math.max(0, Math.floor((Date.now() - savedAt) / 1000));
+  state.remainingSeconds = Math.max(1, savedRemaining - elapsedSecs);
+  state.currentQuestionIndex = Number(activeRecord.currentQuestionIndex ?? activeRecord.exam?.currentQuestionIndex ?? 0);
+  state.currentExam.currentQuestionIndex = state.currentQuestionIndex;
+  state.lastResult = null;
+  state.isSubmitting = false;
+  state.examIntroReady = true;
+  state.examGuardActive = false;
+  clearIntroCountdown();
+  removePreExamGuards();
+  state.view = "exam";
+  try {
+    sessionStorage.setItem("HNIRUJA_SESSION", JSON.stringify({
+      view: "exam",
+      user: state.currentUser,
+      adminSection: state.adminSection,
+      isTestMode: state.isTestMode
+    }));
+  } catch(e) {}
+  return true;
+}
+
+async function fetchActiveExamRecordFromServer(employeeId, quarter = getCurrentQuarter()) {
+  if (!_sb || !employeeId) return null;
+  const key = getActiveExamKey(employeeId, quarter);
+  const { data, error } = await _sb.from("active_exams").select("*").eq("key", key).maybeSingle();
+  if (error) throw error;
+  const record = normalizeActiveExamRecord(data);
+  if (record) {
+    const idx = activeExams.findIndex((item) => item.key === record.key);
+    if (idx >= 0) activeExams[idx] = record;
+    else activeExams.push(record);
+  }
+  return record;
 }
 
 function upsertActiveExamRecord(exam, extra = {}) {
@@ -1630,9 +1750,12 @@ function upsertActiveExamRecord(exam, extra = {}) {
   const key = getActiveExamKey(exam.employeeId, exam.quarter);
   const record = {
     key,
+    employeeId: exam.employeeId,
+    quarter: exam.quarter,
     status: "in_progress",
     updatedAt: new Date().toISOString(),
     remainingSeconds: state.remainingSeconds,
+    currentQuestionIndex: state.currentQuestionIndex || 0,
     exam: JSON.parse(JSON.stringify(exam)),
     ...extra
   };
@@ -1791,7 +1914,52 @@ async function _sbGetAppData() {
         createdAt: detail.createdAt || l.created_at
       };
     }),
-    activeExams: (activeRes.data || []).map((a) => ({ key: a.key, ...(a.snapshot || {}) })),
+    activeExams: (activeRes.data || []).map((a) => {
+      const snap = a.snapshot || {};
+      if (!snap.exam && Array.isArray(snap.questionSet)) {
+        const questions = snap.questionSet.map((q) => {
+          const source = (qbRes.data || []).find((row) => String(row.id) === String(q.id || q.questionId));
+          const baseOptions = [source?.option_1, source?.option_2, source?.option_3, source?.option_4, source?.option_5]
+            .filter((v) => v !== null && v !== undefined && v !== "");
+          const order = Array.isArray(q.optionOrder) ? q.optionOrder : baseOptions.map((_, idx) => idx + 1);
+          const options = order.map((n) => baseOptions[Number(n) - 1] || "").filter((v) => v !== "");
+          const correctOriginal = Number(source?.answer_index ?? q.answerIndex ?? 0);
+          const correctDisplayIndex = Math.max(0, order.findIndex((n) => Number(n) === correctOriginal));
+          return {
+            questionId: q.id || q.questionId,
+            category: q.category || source?.category || "",
+            text: q.text || source?.text || "",
+            options,
+            correctDisplayIndex
+          };
+        });
+        const answers = Array(questions.length).fill(null);
+        const answerMap = snap.answers || {};
+        questions.forEach((q, idx) => {
+          const saved = answerMap[String(q.questionId)];
+          if (!saved) return;
+          if (typeof saved.selectedDisplayIndex === "number") answers[idx] = saved.selectedDisplayIndex;
+          else if (saved.selectedOriginalOption != null && Array.isArray(snap.questionSet?.[idx]?.optionOrder)) {
+            const displayIdx = snap.questionSet[idx].optionOrder.findIndex((n) => Number(n) === Number(saved.selectedOriginalOption));
+            if (displayIdx >= 0) answers[idx] = displayIdx;
+          }
+        });
+        snap.exam = {
+          employeeId: snap.employeeId || a.employee_id,
+          quarter: snap.quarter || a.quarter || getCurrentQuarter(),
+          startedAt: snap.examStartedAt || snap.startedAt || a.updated_at,
+          questions,
+          answers,
+          currentQuestionIndex: Number(snap.currentQuestionIndex || 0),
+          tabSwitchCount: Number(snap.tabSwitchCount || 0),
+          warningLogs: snap.warningLogs || [],
+          disqualified: Boolean(snap.disqualified),
+          disqualificationReason: snap.disqualificationReason || "",
+          lastViolationAt: 0
+        };
+      }
+      return { key: a.key, ...(snap || {}) };
+    }),
     managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" }))
   };
 }
@@ -2042,18 +2210,18 @@ async function _sbDeleteQuestionData(id) {
 async function _sbAdminLogin(payload) {
   try {
     if (!payload || !payload.password) {
-      return { ok: false, message: "비밀번호를 입력하세요." };
+      return { ok: false, message: "관리자 코드를 입력하세요." };
     }
 
     const { data: cfg, error: cfgError } = await _sb.from("admin_config").select("password_hash").eq("id", 1).maybeSingle();
     if (cfgError) throw cfgError;
-    if (!cfg?.password_hash) return { ok: false, message: "관리자 비밀번호 설정이 없습니다." };
+    if (!cfg?.password_hash) return { ok: false, message: "관리자 코드 설정이 없습니다." };
     const storedHash = cfg.password_hash;
     const inputHash = await _sha256(String(payload.password));
 
     if (inputHash !== storedHash) {
       await new Promise((r) => setTimeout(r, 400));
-      return { ok: false, message: "비밀번호가 일치하지 않습니다." };
+      return { ok: false, message: "관리자 코드가 일치하지 않습니다." };
     }
 
     const ts = Date.now();
@@ -2475,11 +2643,11 @@ function _promptAdminPassword() {
     <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="adminPwModalTitle">
       <section class="modal sm">
         <h2 id="adminPwModalTitle" style="margin-bottom:8px">관리자 인증</h2>
-        <p class="muted" style="margin-bottom:16px">관리자 비밀번호를 입력하세요.</p>
+        <p class="muted" style="margin-bottom:16px">관리자 코드를 입력하세요.</p>
         <form onsubmit="_submitAdminPassword(event)">
           <div class="field">
-            <label for="adminPwInput">비밀번호</label>
-            <input id="adminPwInput" type="password" autocomplete="current-password" required minlength="1" />
+            <label for="adminPwInput">관리자 코드</label>
+            <input id="adminPwInput" type="password" autocomplete="off" required minlength="1" />
           </div>
           <div id="adminPwError" class="notice danger" style="display:none;margin-bottom:12px"></div>
           <div class="modal-actions">
@@ -2520,7 +2688,7 @@ async function _submitAdminPassword(event) {
     if (result && result.ok) {
       // 토큰 세션 저장 (탭 닫기 전까지 유지)
       try { sessionStorage.setItem("hniruja_admin_token", JSON.stringify({ token: result.token, ts: result.ts })); } catch(e) {}
-      const admin = users.find(u => u.role === "admin") || { employeeId: result.adminId || "ADM-0001", department: "환경안전", name: "ehs1985", role: "admin" };
+      const admin = { employeeId: result.adminId || "ADM-SERVER", department: "", name: "ADMIN", role: "admin" };
       state.currentUser = admin;
       state.view = "admin";
       state.loginError = "";
@@ -2628,11 +2796,10 @@ function renderLogin() {
           <form onsubmit="handleLogin(event)" class="login-form">
             <div class="field">
               <label for="loginType">구분</label>
-              <select id="loginType" name="type" onchange="updateLoginDepartments(this.value); _toggleAdminPwField(this.value);">
+              <select id="loginType" name="type" onchange="updateLoginDepartments(this.value);">
                 <option value="" hidden disabled selected>구분을 선택하세요</option>
                 <option value="이루자">이루자</option>
                 <option value="협력사">협력사</option>
-                <option value="admin">관리자</option>
               </select>
             </div>
             <div class="field">
@@ -2645,11 +2812,6 @@ function renderLogin() {
               <label for="loginName">성명</label>
               <input id="loginName" name="name" autocomplete="name" placeholder="성명을 입력하세요" required />
             </div>
-            <div class="field" id="adminPwField" style="display:none">
-              <label for="adminPw">관리자 비밀번호</label>
-              <input id="adminPw" name="adminPw" type="password" autocomplete="current-password" placeholder="관리자 비밀번호를 입력하세요" />
-            </div>
-
             <button class="btn primary login-submit-btn" type="submit">
               로그인
             </button>
@@ -2665,7 +2827,7 @@ function renderLogin() {
 function updateLoginDepartments(type) {
   const sel = document.getElementById("loginDepartment");
   if (!sel) return;
-  if (!type || type === "admin") {
+  if (!type) {
     sel.innerHTML = "<option value=''>구분을 먼저 선택하세요</option>";
     sel.disabled = true;
     return;
@@ -2683,32 +2845,42 @@ async function handleLogin(event) {
   const name       = String(form.get("name") || "").trim();
   const type       = String(form.get("type") || "").trim();
 
-  // 관리자 로그인: Supabase admin_config.password_hash 기준 검증
-  if (type === "admin") {
-    const pw = String(form.get("adminPw") || "").trim();
-    if (!pw) {
-      state.loginError = "관리자 비밀번호를 입력해 주세요.";
-      renderLogin();
-      return;
-    }
+  // 테스트 모드: 운영 DB 저장 없이 화면/출제 흐름 점검용
+  if (name.toLowerCase() === "test") {
+    state.currentUser = { employeeId: "TEST-0001", department: department || "테스트", name: "테스트", role: "candidate" };
+    state.loginError  = "";
+    state.isTestMode  = true;
+    state.lastResult  = null;
+    state.currentExam = null;
+    state.view        = "candidate";
+    render();
+    return;
+  }
+
+  // 관리자 코드 로그인: 구분/소속 선택과 무관하게 서버 admin_config.password_hash 기준으로 검증
+  if (name) {
     try {
-      const result = await callExternalApi("adminLogin", { password: pw });
-      if (!result?.ok) throw new Error(result?.message || "관리자 인증 실패");
-      if (result.data) applyRemoteData(result.data);
-      try { sessionStorage.setItem("hniruja_admin_token", JSON.stringify({ token: result.token, ts: result.ts })); } catch(e) {}
-      state.currentUser = users.find(u => u.role === "admin") || { employeeId: result.adminId || "ADM-0001", department: "환경안전", name: "ADMIN", role: "admin" };
-      state.view        = "admin";
-      state.loginError  = "";
-      state.isTestMode  = false;
-      render();
-      return;
+      const result = await callExternalApi("adminLogin", { password: name });
+      if (result?.ok) {
+        if (result.data) applyRemoteData(result.data);
+        try { sessionStorage.setItem("hniruja_admin_token", JSON.stringify({ token: result.token, ts: result.ts })); } catch(e) {}
+        state.currentUser = { employeeId: result.adminId || "ADM-SERVER", department: "", name: "ADMIN", role: "admin" };
+        state.view        = "admin";
+        state.loginError  = "";
+        state.isTestMode  = false;
+        render();
+        return;
+      }
     } catch (e) {
-      state.loginError = "관리자 인증에 실패했습니다: " + (e.message || e);
-      renderLogin();
-      return;
+      // 일반 응시자 로그인 시도일 수 있으므로 관리자 코드 불일치는 조용히 통과합니다.
     }
   }
 
+  if (!name) {
+    state.loginError = "성명을 입력해 주세요.";
+    renderLogin();
+    return;
+  }
   if (!type || !department) {
     state.loginError = !type ? "구분을 선택해 주세요." : "소속을 선택해 주세요.";
     renderLogin();
@@ -2719,60 +2891,48 @@ async function handleLogin(event) {
   if (candidate) {
     state.currentUser = candidate;
     state.loginError  = "";
-    // 서버 데이터 기준으로 화면 결정
-    function _resolveLoginView() {
+    state.lastResult  = null;
+    state.isSubmitting = false;
+
+    const resolveAfterRemote = async () => {
       const currentQuarterResult = examResults
         .filter(result => result.employeeId === candidate.employeeId && result.quarter === getCurrentQuarter())
-        .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
-      // 서버 동기화 완료(또는 오프라인) 후에만 결과화면 진입
-      if (currentQuarterResult && (state._remoteLoaded || (!isAppsScriptRuntime() && !isExternalApiRuntime()))) {
+        .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
+      if (currentQuarterResult) {
         state.lastResult = currentQuarterResult;
         state.view = "result";
-        render();
+        renderResultScreen();
         return;
       }
-      const activeRecord = getActiveExamRecord(candidate.employeeId);
-      if (activeRecord?.exam) {
-        state.currentExam = activeRecord.exam;
-        const savedRemaining = Number(activeRecord.remainingSeconds || examSettings.timeLimitMinutes * 60);
-        const savedAt = activeRecord.updatedAt ? new Date(activeRecord.updatedAt).getTime() : Date.now();
-        const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
-        state.remainingSeconds = Math.max(1, savedRemaining - elapsedSecs);
-        state.currentQuestionIndex = 0;
-        state.lastResult = null;
-        state.isSubmitting = false;
-        state.view = "exam";
-        if (state.currentExam.tabSwitchCount >= examSettings.tabSwitchLimit) {
-          state.currentExam.disqualified = true;
-          state.currentExam.disqualificationReason = `탭 전환 ${examSettings.tabSwitchLimit}회 이상`;
-          submitExam(true, true, `재접속 전 이탈 누적 ${state.currentExam.tabSwitchCount}회로 자동 제출 및 실격`);
-        } else {
-          renderExamScreen();
-          startTimer();
-        }
+
+      let activeRecord = getActiveExamRecord(candidate.employeeId);
+      try {
+        const serverRecord = await fetchActiveExamRecordFromServer(candidate.employeeId);
+        if (serverRecord) activeRecord = serverRecord;
+      } catch (e) {
+        console.warn("진행 중 시험 직접 조회 실패", e);
+      }
+
+      if (restoreActiveExamRecord(activeRecord)) {
+        renderExamScreen();
+        startTimer();
         return;
       }
-      state.lastResult = null;
+
       state.view = "candidate";
-      render();
-    }
-    // 시험 진행 중이면 로컬로 즉시 복원 (타이머 연속성)
-    const _activeRec = getActiveExamRecord(candidate.employeeId);
-    if (_activeRec?.exam) {
-      _resolveLoginView();
+      renderCandidateDashboard();
+    };
+
+    state.view = "loading";
+    renderLoadingScreen("응시 정보를 확인하는 중입니다", 30);
+    if (isAppsScriptRuntime() || isExternalApiRuntime()) {
+      loadRemoteData(() => {
+        updateLoadingProgress(100, "완료!");
+        setTimeout(() => { resolveAfterRemote(); }, 100);
+      });
     } else {
-      // 결과/대기 화면은 원격 데이터 확인 후 진입 (관리자 초기화 즉시 반영)
-      if (isAppsScriptRuntime() || isExternalApiRuntime()) {
-        state.view = "loading";
-        renderLoadingScreen("응시 정보를 확인하는 중입니다", 30);
-        loadRemoteData(() => {
-          updateLoadingProgress(100, "완료!");
-          setTimeout(() => _resolveLoginView(), 150);
-        });
-      } else {
-        _resolveLoginView();
-      }
-    } // loadRemoteData 콜백 끝
+      resolveAfterRemote();
+    }
     return;
   }
 
@@ -2805,6 +2965,13 @@ function renderCandidateDashboard() {
     renderResultScreen();
     return;
   }
+  const activeRecord = getActiveExamRecord(user.employeeId, quarter);
+  if (restoreActiveExamRecord(activeRecord)) {
+    renderExamScreen();
+    startTimer();
+    return;
+  }
+
   cleanOrphanQuota();
   const shortageWarnings = getQuotaWarnings();
 
@@ -2952,6 +3119,13 @@ function startExam() {
     return;
   }
 
+  const activeRecord = getActiveExamRecord(user.employeeId);
+  if (!state.isTestMode && restoreActiveExamRecord(activeRecord)) {
+    renderExamScreen();
+    startTimer();
+    return;
+  }
+
   // 응시자와 분기 기준 시드를 먼저 설정한 뒤 문제를 생성합니다.
   // 진행 중 시험은 저장되어 새로고침 또는 재접속 시 이어서 복구됩니다.
   _examSeed = _strHash(user.employeeId + getCurrentQuarter());
@@ -3033,7 +3207,9 @@ function startTimer() {
   addExamGuards();
   state.timerId = setInterval(() => {
     state.remainingSeconds -= 1;
+    if (state.currentExam) state.currentExam.currentQuestionIndex = state.currentQuestionIndex || 0;
     if (state.remainingSeconds % 5 === 0) persistCurrentExam(false);
+    if (state.remainingSeconds % 15 === 0) persistCurrentExam(true);
     const timer = document.getElementById("remainingTime");
     if (timer) timer.textContent = formatRemainingTime(state.remainingSeconds);
     if (state.remainingSeconds <= 0) {
@@ -3343,6 +3519,8 @@ function selectAnswerLock(questionIndex, optionIndex) {
   // 이미 같은 답이 선택된 경우 → 선택 해제(토글)
   if (state.currentExam.answers[questionIndex] === optionIndex) {
     state.currentExam.answers[questionIndex] = null;
+    state.currentQuestionIndex = questionIndex;
+    state.currentExam.currentQuestionIndex = questionIndex;
     persistCurrentExam();
     const qSection = document.getElementById(`q${questionIndex}`);
     if (qSection) {
@@ -3361,6 +3539,8 @@ function selectAnswerLock(questionIndex, optionIndex) {
 function selectAnswerAll(questionIndex, optionIndex) {
   if (!state.currentExam) return;
   state.currentExam.answers[questionIndex] = optionIndex;
+  state.currentQuestionIndex = questionIndex;
+  state.currentExam.currentQuestionIndex = questionIndex;
   persistCurrentExam();
 
   const qSection = document.getElementById(`q${questionIndex}`);
@@ -5082,17 +5262,7 @@ function renderLogManager() {
   <script>
     // ── 앱 진입점 ──
     function restoreExamFromActiveRecord(user) {
-      const rec = getActiveExamRecord(user.employeeId);
-      if (!rec?.exam) return false;
-      state.currentExam = rec.exam;
-      const savedRemaining = Number(rec.remainingSeconds || examSettings.timeLimitMinutes * 60);
-      const savedAt = rec.updatedAt ? new Date(rec.updatedAt).getTime() : Date.now();
-      const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
-      state.remainingSeconds = Math.max(1, savedRemaining - elapsedSecs);
-      state.currentQuestionIndex = 0;
-      state.isSubmitting = false;
-      state.view = "exam";
-      return true;
+      return restoreActiveExamRecord(getActiveExamRecord(user.employeeId));
     }
 
     function initApp() {
