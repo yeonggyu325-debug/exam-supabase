@@ -1543,8 +1543,9 @@ function nextId(array, key) {
 }
 
 function makeResultId(employeeId, quarter) {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return String(employeeId || "") + "_" + String(quarter || "") + "_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  const raw = String(employeeId || "") + "__" + String(quarter || "");
+  const hash = _strHash(raw).toString(16).toUpperCase().padStart(8, "0");
+  return "R-" + hash;
 }
 
 function makeLogId() {
@@ -1649,45 +1650,15 @@ function clearActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
 function persistCurrentExam(saveRemote = true) {
   if (!state.currentExam) return;
   const record = upsertActiveExamRecord(state.currentExam);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations }));
-  } catch (error) {
-    console.warn("진행 중 시험 저장에 실패했습니다.", error);
-  }
   if (saveRemote && record) {
-    saveActiveExamRecord(record).catch(error => console.warn("진행 중 시험 원격 저장에 실패했습니다.", error));
+    saveActiveExamRecord(record).catch(error => console.warn("진행 중 시험 서버 저장에 실패했습니다.", error));
   }
 }
 
 function mergeLocalActiveExams() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const localData = JSON.parse(raw);
-    if (!Array.isArray(localData.activeExams)) return;
-    localData.activeExams.forEach(localRecord => {
-      if (!localRecord?.key || localRecord.status !== "in_progress") return;
-      // 초기화된 응시자 감지: 서버 examResults에 해당 employeeId 기록이 없고
-      // 서버 activeExams에도 없으면 → 관리자가 초기화한 것으로 판단, 로컬 것 무시
-      const empId = localRecord.employeeId || localRecord.key?.split("__")[0];
-      const quarter = getCurrentQuarter();
-      const serverHasResult = examResults.some(r => r.employeeId === empId);
-      const serverHasActive = activeExams.some(a => a.key === localRecord.key);
-      // 서버에 결과도 없고 activeExam도 없으면 초기화된 상태 → 병합 스킵
-      if (!serverHasResult && !serverHasActive) return;
-      const remoteIndex = activeExams.findIndex(item => item.key === localRecord.key);
-      const remoteRecord = remoteIndex >= 0 ? activeExams[remoteIndex] : null;
-      const localTime = new Date(localRecord.updatedAt || 0).getTime();
-      const remoteTime = new Date(remoteRecord?.updatedAt || 0).getTime();
-      if (!remoteRecord || localTime >= remoteTime) {
-        if (remoteIndex >= 0) activeExams[remoteIndex] = localRecord;
-        else activeExams.push(localRecord);
-      }
-    });
-  } catch (error) {
-    console.warn("진행 중 시험 로컬 병합에 실패했습니다.", error);
-  }
+  // 운영 버전: 로컬 저장소 병합 사용 안 함
 }
+
 
 
 const STORAGE_KEY = "hniruja_exam_platform_v2";
@@ -1778,7 +1749,6 @@ async function _sbGetAppData() {
       employeeId: u.employee_id,
       department: u.department || "",
       name: u.name || "",
-      phone: u.phone || "",
       role: u.role || "candidate"
     })),
     questionBank: (qbRes.data || []).map((q) => ({
@@ -1834,7 +1804,7 @@ async function _sbSaveAppData(snapshot) {
           employee_id: u.employeeId,
           department: u.department || "",
           name: u.name || "",
-          phone: u.phone || "",
+          phone: "",
           role: u.role || "candidate"
         })),
         { onConflict: "employee_id" }
@@ -1901,39 +1871,9 @@ async function _sbSaveAppData(snapshot) {
       }
     }
 
-    if (Array.isArray(snapshot.activeExams)) {
-      const { error: delError } = await _sb.from("active_exams").delete().neq("key", "");
-      if (delError) throw delError;
-
-      if (snapshot.activeExams.length) {
-        const { error } = await _sb.from("active_exams").insert(
-          snapshot.activeExams.map(({ key, ...rest }) => ({
-            key,
-            employee_id: rest.employeeId || key?.split("__")?.[0] || "",
-            quarter: rest.quarter || key?.split("__")?.[1] || "",
-            snapshot: rest
-          }))
-        );
-        if (error) throw error;
-      }
-    }
-
-    if (Array.isArray(snapshot.activityLogs)) {
-      const { error: delError } = await _sb.from("activity_logs").delete().neq("log_id", "");
-      if (delError) throw delError;
-
-      if (snapshot.activityLogs.length) {
-        const { error } = await _sb.from("activity_logs").insert(
-          snapshot.activityLogs.map((l) => ({
-            log_id: String(l.logId || makeLogId()),
-            employee_id: l.employeeId || "",
-            action: l.type || l.action || "",
-            detail: JSON.stringify(l)
-          }))
-        );
-        if (error) throw error;
-      }
-    }
+    // 운영 버전: active_exams와 activity_logs는 전체 스냅샷 저장에서 제외합니다.
+    // 진행 상태는 saveActiveExamData로 개별 upsert, 로그는 insertActivityLogData로 append-only 저장합니다.
+    // 전체 delete 후 insert 방식은 동시접속 중 진행상태/로그 유실 위험이 있어 사용하지 않습니다.
 
     return { ok: true, retry: false };
   } catch (err) {
@@ -2105,8 +2045,10 @@ async function _sbAdminLogin(payload) {
       return { ok: false, message: "비밀번호를 입력하세요." };
     }
 
-    const { data: cfg } = await _sb.from("admin_config").select("password_hash").eq("id", 1).maybeSingle();
-    const storedHash = cfg ? cfg.password_hash : await _sha256("ehs1985");
+    const { data: cfg, error: cfgError } = await _sb.from("admin_config").select("password_hash").eq("id", 1).maybeSingle();
+    if (cfgError) throw cfgError;
+    if (!cfg?.password_hash) return { ok: false, message: "관리자 비밀번호 설정이 없습니다." };
+    const storedHash = cfg.password_hash;
     const inputHash = await _sha256(String(payload.password));
 
     if (inputHash !== storedHash) {
@@ -2180,18 +2122,12 @@ function applyRemoteData(data) {
   }
   // 시험 진행 중인 응시자만 로컬 activeExam 병합 (초기화된 응시자는 제외)
   mergeLocalActiveExams();
-  // 서버 데이터를 로컬스토리지에 즉시 반영 → 다음 로드 시 최신 서버 상태 유지
-  overwriteLocalCache();
 }
 
 function overwriteLocalCache() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      users, questionBank, examSettings,
-      examResults, activityLogs, activeExams, managedAffiliations
-    }));
-  } catch(e) {}
+  // 운영 버전: 서버 데이터를 브라우저 로컬 저장소에 복제하지 않음
 }
+
 
 function loadRemoteData(done) {
   if (isAppsScriptRuntime()) {
@@ -2201,8 +2137,8 @@ function loadRemoteData(done) {
         catch (error) { console.warn("스프레드시트 데이터 복원에 실패했습니다.", error); done(false); }
       })
       .withFailureHandler(error => {
-        console.warn("스프레드시트 연결에 실패했습니다. 브라우저 저장소로 전환합니다.", error);
-        loadPersistentData();
+        console.warn("스프레드시트 연결에 실패했습니다.", error);
+        state.loginError = "서버 연결에 실패했습니다. 네트워크 또는 데이터베이스 상태를 확인해 주세요.";
         done(false);
       })
       .getAppData();
@@ -2214,8 +2150,7 @@ function loadRemoteData(done) {
       .then(data => { applyRemoteData(data); state._remoteLoaded = true; done(true); })
       .catch(error => {
         console.error("Supabase 데이터 로드에 실패했습니다.", error);
-        state.loginError = "데이터베이스 연결에 실패했습니다. 네트워크 또는 Supabase 권한 설정을 확인해 주세요.";
-        loadPersistentData();
+        state.loginError = "서버 연결에 실패했습니다. 네트워크 또는 Supabase 권한 설정을 확인해 주세요.";
         done(false);
       });
     return;
@@ -2274,40 +2209,15 @@ function _retryRemoteSave() {
 }
 
 function getPendingSubmissionKey(employeeId, quarter) {
-  return "pending_submission_" + employeeId + "_" + quarter;
+  return "pending_submission_disabled";
 }
 
 function savePendingSubmission(result, log) {
-  try {
-    localStorage.setItem(
-      getPendingSubmissionKey(result.employeeId, result.quarter),
-      JSON.stringify({ result, log, savedAt: new Date().toISOString() })
-    );
-  } catch (e) {
-    console.warn("pending 제출 저장 실패", e);
-  }
+  // 운영 버전: 제출 결과는 로컬에 임시 저장하지 않음
 }
 
 async function retryPendingSubmissions(employeeId = "") {
-  const keys = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith("pending_submission_")) continue;
-      if (employeeId && !key.startsWith("pending_submission_" + employeeId + "_")) continue;
-      keys.push(key);
-    }
-
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const pending = JSON.parse(raw);
-      const res = await _sendExamSubmissionOnce(pending.result, pending.log);
-      if (res?.ok) localStorage.removeItem(key);
-    }
-  } catch (e) {
-    console.warn("pending 제출 재전송 실패", e);
-  }
+  // 운영 버전: 로컬 pending 제출 재전송 사용 안 함
 }
 
 async function _sendExamSubmissionOnce(result, log) {
@@ -2324,7 +2234,7 @@ async function _sendExamSubmissionOnce(result, log) {
     return await callExternalApi("appendExamSubmission", { result, log });
   }
 
-  return { ok: true, localOnly: true };
+  return { ok: false, message: "서버 연결을 사용할 수 없습니다." };
 }
 
 async function saveActiveExamRecord(record) {
@@ -2348,26 +2258,20 @@ async function appendResultToSheet(result, log) {
     try {
       const res = await _sendExamSubmissionOnce(result, log);
       if (res?.ok === false) throw new Error(res.message || "제출 저장 실패");
-
-      try {
-        localStorage.removeItem(getPendingSubmissionKey(result.employeeId, result.quarter));
-      } catch (e) {}
-
       return { ok: true, duplicate: !!res?.duplicate };
     } catch (error) {
-      console.warn("응시 결과 저장 실패 " + (attempt + 1) + "회", error);
+      console.warn("응시 결과 서버 저장 실패 " + (attempt + 1) + "회", error);
       if (attempt >= delays.length) {
-        savePendingSubmission(result, log);
         return {
           ok: false,
-          pending: true,
-          message: "제출이 지연되고 있습니다. 네트워크 연결 후 재접속하면 자동 재전송됩니다."
+          message: "서버 저장에 실패했습니다. 네트워크 연결 또는 데이터베이스 상태를 확인한 뒤 다시 제출해 주세요."
         };
       }
       await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
     }
   }
 }
+
 
 function getAffiliations() {
   managedAffiliations = normalizeManagedAffiliations(managedAffiliations);
@@ -2389,37 +2293,13 @@ function affiliationOptions(selected = "") {
 }
 
 function savePersistentData() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations }));
-  } catch (error) {
-    console.warn("저장소 기록에 실패했습니다.", error);
-  }
   queueRemoteSave();
 }
 
 function loadPersistentData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    const data = JSON.parse(raw);
-    if (Array.isArray(data.users)) users = data.users;
-    if (Array.isArray(data.questionBank)) questionBank = data.questionBank;
-    if (data.examSettings) {
-      examSettings = { ...examSettings, ...data.examSettings };
-      cleanOrphanQuota();
-    }
-    if (Array.isArray(data.examResults)) examResults = data.examResults;
-    if (Array.isArray(data.activityLogs)) activityLogs = data.activityLogs;
-    if (Array.isArray(data.activeExams)) activeExams = data.activeExams;
-    if (Array.isArray(data.managedAffiliations)) {
-      managedAffiliations = normalizeManagedAffiliations(data.managedAffiliations);
-    }
-    return true;
-  } catch (error) {
-    console.warn("저장소 복원에 실패했습니다.", error);
-    return false;
-  }
+  return false;
 }
+
 
 function formatDateOnly(iso) {
   if (!iso) return "-";
@@ -2450,19 +2330,19 @@ function getResultComment(result) {
 /* ── js/data.js ── */
 "use strict";
 
-// ※ 데모용 메모리 데이터입니다. 실제 운영에서는 서버 인증, DB 저장, 감사 로그 저장으로 교체해야 합니다.
+// 운영 데이터는 Supabase에서만 로드합니다.
 
 let users = [];
-
 let managedAffiliations = [];
+
 
 let questionBank = [];
 
 let examSettings = {
-  totalQuestions: 20  ,
+  totalQuestions: 20,
   timeLimitMinutes: 30,
   passingScore: 60,
-  pointsPerQuestion: 5,
+  pointsPerQuestion: 1,
   randomizeQuestions: true,
   randomizeOptions: true,
   tabSwitchLimit: 3,
@@ -2475,7 +2355,7 @@ let activityLogs = [];
 let activeExams = [];
 
 function _initSampleData() {
-  // 샘플 데이터 없음 - 관리자가 직접 등록
+  // 운영 버전: 샘플 데이터 주입 없음
 }
 
 
@@ -2748,10 +2628,11 @@ function renderLogin() {
           <form onsubmit="handleLogin(event)" class="login-form">
             <div class="field">
               <label for="loginType">구분</label>
-              <select id="loginType" name="type" onchange="updateLoginDepartments(this.value);">
+              <select id="loginType" name="type" onchange="updateLoginDepartments(this.value); _toggleAdminPwField(this.value);">
                 <option value="" hidden disabled selected>구분을 선택하세요</option>
                 <option value="이루자">이루자</option>
                 <option value="협력사">협력사</option>
+                <option value="admin">관리자</option>
               </select>
             </div>
             <div class="field">
@@ -2763,6 +2644,10 @@ function renderLogin() {
             <div class="field" id="loginNameField">
               <label for="loginName">성명</label>
               <input id="loginName" name="name" autocomplete="name" placeholder="성명을 입력하세요" required />
+            </div>
+            <div class="field" id="adminPwField" style="display:none">
+              <label for="adminPw">관리자 비밀번호</label>
+              <input id="adminPw" name="adminPw" type="password" autocomplete="current-password" placeholder="관리자 비밀번호를 입력하세요" />
             </div>
 
             <button class="btn primary login-submit-btn" type="submit">
@@ -2791,34 +2676,37 @@ function updateLoginDepartments(type) {
     list.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join("");
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   const form       = new FormData(event.currentTarget);
   const department = String(form.get("department") || "").trim();
   const name       = String(form.get("name") || "").trim();
   const type       = String(form.get("type") || "").trim();
 
-  // 관리자 로그인: 이름 입력으로 진입
-  if (name === "ehs1985") {
-    const admin = users.find(u => u.role === "admin") || { employeeId: "ADM-0001", department: "환경안전", name: "ehs1985", role: "admin" };
-    state.currentUser = admin;
-    state.view        = "admin";
-    state.loginError  = "";
-    state.isTestMode  = false;
-    retryPendingSubmissions();
-    render();
-    return;
-  }
-
-  // 테스트 모드: 소속 무관, "테스트" 카테고리 문제만 출제, DB 저장 없음
-  if (name === "test") {
-    state.currentUser = { employeeId: "TEST-0001", department: "테스트", name: "test", role: "candidate" };
-    state.isTestMode  = true;
-    state.loginError  = "";
-    state.lastResult  = null;
-    state.view        = "candidate";
-    render();
-    return;
+  // 관리자 로그인: Supabase admin_config.password_hash 기준 검증
+  if (type === "admin") {
+    const pw = String(form.get("adminPw") || "").trim();
+    if (!pw) {
+      state.loginError = "관리자 비밀번호를 입력해 주세요.";
+      renderLogin();
+      return;
+    }
+    try {
+      const result = await callExternalApi("adminLogin", { password: pw });
+      if (!result?.ok) throw new Error(result?.message || "관리자 인증 실패");
+      if (result.data) applyRemoteData(result.data);
+      try { sessionStorage.setItem("hniruja_admin_token", JSON.stringify({ token: result.token, ts: result.ts })); } catch(e) {}
+      state.currentUser = users.find(u => u.role === "admin") || { employeeId: result.adminId || "ADM-0001", department: "환경안전", name: "ADMIN", role: "admin" };
+      state.view        = "admin";
+      state.loginError  = "";
+      state.isTestMode  = false;
+      render();
+      return;
+    } catch (e) {
+      state.loginError = "관리자 인증에 실패했습니다: " + (e.message || e);
+      renderLogin();
+      return;
+    }
   }
 
   if (!type || !department) {
@@ -2831,8 +2719,7 @@ function handleLogin(event) {
   if (candidate) {
     state.currentUser = candidate;
     state.loginError  = "";
-    retryPendingSubmissions(candidate.employeeId);
-    // 로컬 데이터로 즉시 화면 결정 (빠른 진입)
+    // 서버 데이터 기준으로 화면 결정
     function _resolveLoginView() {
       const currentQuarterResult = examResults
         .filter(result => result.employeeId === candidate.employeeId && result.quarter === getCurrentQuarter())
@@ -3571,7 +3458,6 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
   if (hasAttemptedThisQuarter(state.currentUser.employeeId, state.currentExam.quarter)) {
     alert("이미 제출된 응시 기록이 있습니다.");
     clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
-    try { localStorage.removeItem("exam_answers_" + state.currentUser.employeeId); } catch(e) {}
     state.currentExam  = null;
     state.view         = "candidate";
     state.isSubmitting = false;
@@ -3624,16 +3510,18 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
   };
 
   if (!state.isTestMode) {
+    const saveResult = await appendResultToSheet(result, submitLog);
+    if (!saveResult?.ok) {
+      alert(saveResult?.message || "서버 저장에 실패했습니다. 다시 제출해 주세요.");
+      state.isSubmitting = false;
+      addExamGuards();
+      startTimer();
+      renderExamScreen();
+      return;
+    }
     examResults.push(result);
     activityLogs.push(submitLog);
     clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
-    overwriteLocalCache();
-    const saveResult = await appendResultToSheet(result, submitLog);
-    if (!saveResult.ok && saveResult.pending) {
-      alert(saveResult.message);
-    }
-    // §6: 제출 완료 후 localStorage 임시 답안 삭제
-    try { localStorage.removeItem("exam_answers_" + result.employeeId); } catch(e) {}
   }
 
   state.lastResult   = result;
@@ -3810,7 +3698,7 @@ function refreshFromRemote() {
       render();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = "⟳ 새로고침"; }
-      alert("서버 연결에 실패했습니다. 로컬 데이터를 표시합니다.");
+      alert("서버 연결에 실패했습니다. 네트워크 또는 Supabase 상태를 확인해 주세요.");
     }
   });
 }
@@ -4116,8 +4004,8 @@ function adminRefreshData() {
   if (isAppsScriptRuntime() || isExternalApiRuntime()) {
     loadRemoteData(() => renderAdminDashboard());
   } else {
-    loadPersistentData();
-    renderAdminDashboard();
+    state.loginError = "서버 연결을 사용할 수 없습니다.";
+    renderLogin();
   }
 }
 
@@ -4195,7 +4083,6 @@ function _buildUserRowsHtml(rows) {
       disqBadge = `<span class="badge danger">부정행위 의심</span>`;
     }
 
-    const phone = escapeHtml(user.phone || "-");
 
     const activeRec = getActiveExamRecord(user.employeeId);
     const startedAt  = latest?.startedAt
@@ -4209,7 +4096,6 @@ function _buildUserRowsHtml(rows) {
       <td><span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;${typeColor}">${escapeHtml(userType)}</span></td>
       <td>${escapeHtml(user.department) || "-"}</td>
       <td><strong>${escapeHtml(user.name)}</strong></td>
-      <td style="font-size:13px;color:var(--muted)">${phone}</td>
       <td>${statusBadge}</td>
       <td>${latest ? `<strong>${latest.percentageScore}점</strong>` : "-"}</td>
       <td>${passBadge}</td>
@@ -4328,7 +4214,7 @@ function renderUserManager() {
         <table>
           <thead>
             <tr>
-              <th>구분</th><th>소속</th><th>성명</th><th>연락처</th>
+              <th>구분</th><th>소속</th><th>성명</th>
               <th>응시상태</th><th>점수</th><th>합격여부</th>
               <th>화면이탈횟수</th><th>실격여부</th>
               <th>시작일시</th><th>제출일시</th><th>최종수정일시</th><th>관리</th>
@@ -4404,11 +4290,6 @@ function openUserModal() {
             <label for="newUserName">성명</label>
             <input id="newUserName" name="name" placeholder="성명을 입력하세요" required autocomplete="off">
           </div>
-          <div class="field">
-            <label for="newUserPhone">연락처 (선택)</label>
-            <input id="newUserPhone" name="phone" type="tel" placeholder="010-0000-0000" autocomplete="off">
-          </div>
-
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
             <button class="btn" type="button" onclick="closeModal()">취소</button>
             <button class="btn primary" type="submit">추가</button>
@@ -4428,23 +4309,12 @@ function updateUserModalDepts(type) {
 }
 
 
-function generateEmployeeId() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const prefix = `U-${y}${m}${d}`;
-  let seq = users
-    .filter(user => String(user.employeeId || "").startsWith(prefix))
-    .map(user => Number(String(user.employeeId).split("-").pop()) || 0)
-    .reduce((max, value) => Math.max(max, value), 0) + 1;
-  let employeeId = `${prefix}-${String(seq).padStart(4, "0")}`;
-  while (users.some(user => user.employeeId === employeeId)) {
-    seq += 1;
-    employeeId = `${prefix}-${String(seq).padStart(4, "0")}`;
-  }
-  return employeeId;
+function generateEmployeeId(department = "", name = "") {
+  const raw = String(department || "") + "__" + String(name || "");
+  const hash = _strHash(raw).toString(16).toUpperCase().padStart(8, "0");
+  return "U-" + hash;
 }
+
 
 function addUser(event) {
   event.preventDefault();
@@ -4452,14 +4322,13 @@ function addUser(event) {
   const type       = String(form.get("type") || "이루자").trim();
   const department = String(form.get("department")).trim();
   const name       = String(form.get("name")).trim();
-  const phone      = String(form.get("phone") || "").trim();
-  const employeeId = generateEmployeeId();
+  const employeeId = generateEmployeeId(department, name);
 
   if (users.some(user => user.role === "candidate" && user.department === department && user.name === name)) {
     alert("같은 소속과 성명의 응시자가 이미 있습니다. 로그인 혼동 방지를 위해 이름 표기를 구분해 주세요.");
     return;
   }
-  users.push({ employeeId, department, name, phone, role: "candidate" });
+  users.push({ employeeId, department, name, role: "candidate" });
   savePersistentData();
   closeModal();
   renderAdminDashboard();
@@ -5212,78 +5081,84 @@ function renderLogManager() {
 
   <script>
     // ── 앱 진입점 ──
+    function restoreExamFromActiveRecord(user) {
+      const rec = getActiveExamRecord(user.employeeId);
+      if (!rec?.exam) return false;
+      state.currentExam = rec.exam;
+      const savedRemaining = Number(rec.remainingSeconds || examSettings.timeLimitMinutes * 60);
+      const savedAt = rec.updatedAt ? new Date(rec.updatedAt).getTime() : Date.now();
+      const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
+      state.remainingSeconds = Math.max(1, savedRemaining - elapsedSecs);
+      state.currentQuestionIndex = 0;
+      state.isSubmitting = false;
+      state.view = "exam";
+      return true;
+    }
+
     function initApp() {
       _initSampleData();
-      loadPersistentData();
-      retryPendingSubmissions();
 
-      // F5 새로고침 시 이전 화면 복원
-      let restored = false;
+      let savedSession = null;
       try {
         const saved = sessionStorage.getItem("HNIRUJA_SESSION");
-        if (saved) {
-          const sess = JSON.parse(saved);
-          if (sess.user && sess.view) {
-            state.currentUser  = sess.user;
-            state.adminSection = sess.adminSection || "dashboard";
-            state.isTestMode   = sess.isTestMode   || false;
-            // 시험 중이었으면 activeExams에서 복원
-            if (sess.view === "exam") {
-              const rec = getActiveExamRecord(sess.user.employeeId);
-              if (rec?.exam) {
-                state.currentExam = rec.exam;
-                const savedRemaining = Number(rec.remainingSeconds || examSettings.timeLimitMinutes * 60);
-                const savedAt = rec.updatedAt ? new Date(rec.updatedAt).getTime() : Date.now();
-                const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
-                state.remainingSeconds = Math.max(1, savedRemaining - elapsedSecs);
-                state.currentQuestionIndex = 0;
-                state.isSubmitting = false;
-                state.view = "exam";
-              } else {
-                state.view = "candidate";
-              }
-            } else {
-              state.view = sess.view;
-            }
-            restored = true;
-          }
-        }
+        if (saved) savedSession = JSON.parse(saved);
       } catch(e) {}
-
-      if (!restored) state.view = "login";
 
       // 새로고침 직후 탭전환 오감지 방지 플래그
       window._appJustLoaded = true;
       setTimeout(() => { window._appJustLoaded = false; }, 800);
 
-      render();
+      state.view = "loading";
+      renderLoadingScreen("서버 데이터를 불러오는 중입니다", 30);
 
-      // 시험 복원이면 타이머/가드 재등록
-      if (state.view === "exam" && state.currentExam) {
-        setTimeout(() => { startTimer(); }, 100);
+      if (!(isAppsScriptRuntime() || isExternalApiRuntime())) {
+        state.loginError = "서버 연결을 사용할 수 없습니다. Supabase 연결 상태를 확인해 주세요.";
+        state.view = "login";
+        render();
+        return;
       }
 
-      // 백그라운드 원격 동기화 — result 화면은 서버 검증 후 재확인
-      if (isAppsScriptRuntime() || isExternalApiRuntime()) {
-        loadRemoteData((ok) => {
-          if (!ok) return;
-          // 결과 화면인 경우: 서버 데이터 기준으로 재검증
-          if (state.view === "result" && state.currentUser) {
-            const empId = state.currentUser.employeeId;
-            const serverResult = examResults
-              .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
-              .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
-            if (!serverResult) {
-              // 서버에 결과 없음 = 초기화됨 → 대기 화면으로
-              state.lastResult = null;
-              state.view = "candidate";
-            } else {
-              state.lastResult = serverResult;
-            }
+      loadRemoteData((ok) => {
+        if (!ok) {
+          state.view = "login";
+          render();
+          return;
+        }
+
+        let restored = false;
+        if (savedSession?.user && savedSession?.view) {
+          state.currentUser  = savedSession.user;
+          state.adminSection = savedSession.adminSection || "dashboard";
+          state.isTestMode   = false;
+          if (savedSession.view === "exam") {
+            restored = restoreExamFromActiveRecord(savedSession.user);
+            if (!restored) state.view = "candidate";
+          } else {
+            state.view = savedSession.view;
+            restored = true;
           }
-          if (state.view !== "exam") render();
-        });
-      }
+        }
+
+        if (!restored) state.view = "login";
+
+        if (state.view === "result" && state.currentUser) {
+          const empId = state.currentUser.employeeId;
+          const serverResult = examResults
+            .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
+            .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
+          if (!serverResult) {
+            state.lastResult = null;
+            state.view = "candidate";
+          } else {
+            state.lastResult = serverResult;
+          }
+        }
+
+        render();
+        if (state.view === "exam" && state.currentExam) {
+          setTimeout(() => { startTimer(); }, 100);
+        }
+      });
     }
     initApp();
   </script>
