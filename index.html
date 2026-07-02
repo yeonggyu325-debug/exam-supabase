@@ -1911,7 +1911,11 @@ async function _sbGetAppData() {
         type: detail.type || detail.action || l.action || "",
         message: detail.message || detail.detail || "",
         tabSwitchCount: detail.tabSwitchCount || 0,
-        createdAt: detail.createdAt || l.created_at
+        createdAt: detail.createdAt || l.created_at,
+        quarter: detail.quarter || "",
+        answerReview: Array.isArray(detail.answerReview) ? detail.answerReview : [],
+        questionSetSummary: detail.questionSetSummary || null,
+        rawDetail: detail
       };
     }),
     activeExams: (activeRes.data || []).map((a) => {
@@ -3623,6 +3627,34 @@ function calculateScore(exam) {
   }
 }
 
+
+function buildAnswerReview(exam) {
+  if (!exam || !Array.isArray(exam.questions)) return [];
+  return exam.questions.map((question, index) => {
+    const selectedDisplayIndex = exam.answers?.[index];
+    const selectedText = selectedDisplayIndex === null || selectedDisplayIndex === undefined
+      ? ""
+      : (question.options?.[selectedDisplayIndex] || "");
+    const correctDisplayIndex = question.correctDisplayIndex;
+    const correctText = correctDisplayIndex === null || correctDisplayIndex === undefined
+      ? ""
+      : (question.options?.[correctDisplayIndex] || "");
+    return {
+      no: index + 1,
+      questionId: question.questionId,
+      category: question.category || "",
+      text: question.text || "",
+      options: Array.isArray(question.options) ? question.options.slice() : [],
+      selectedDisplayIndex: selectedDisplayIndex,
+      selectedText,
+      correctDisplayIndex,
+      correctText,
+      correct: selectedDisplayIndex !== null && selectedDisplayIndex !== undefined && selectedDisplayIndex === correctDisplayIndex,
+      unanswered: selectedDisplayIndex === null || selectedDisplayIndex === undefined
+    };
+  });
+}
+
 async function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessage = "시험 제출 완료") {
   // §7: 프론트 중복 제출 방지
   if (!state.currentExam || state.isSubmitting) return;
@@ -3686,7 +3718,16 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
     type: result.disqualified ? "DISQUALIFIED_SUBMIT" : (isAutoSubmit ? "AUTO_SUBMIT" : "SUBMIT"),
     message: submitMessage,
     tabSwitchCount: result.tabSwitchCount,
-    createdAt: result.submittedAt
+    createdAt: result.submittedAt,
+    quarter: result.quarter,
+    resultId: result.resultId,
+    questionSetSummary: {
+      totalCount: result.totalCount,
+      correctCount: result.correctCount,
+      percentageScore: result.percentageScore,
+      categories: Array.from(new Set((state.currentExam.questions || []).map(q => q.category || ""))).filter(Boolean)
+    },
+    answerReview: buildAnswerReview(state.currentExam)
   };
 
   if (!state.isTestMode) {
@@ -4213,6 +4254,97 @@ function _getUserType(user) {
   return affil ? (typeof affil === "string" ? "이루자" : affil.type) : "이루자";
 }
 
+
+function getSubmissionAnswerLog(employeeId, result) {
+  const resultTime = result?.submittedAt ? new Date(result.submittedAt).getTime() : 0;
+  const submitTypes = new Set(["SUBMIT", "AUTO_SUBMIT", "DISQUALIFIED_SUBMIT"]);
+  return activityLogs
+    .filter(log => log.employeeId === employeeId)
+    .filter(log => submitTypes.has(log.type))
+    .filter(log => !result?.quarter || !log.quarter || log.quarter === result.quarter)
+    .filter(log => Array.isArray(log.answerReview) && log.answerReview.length)
+    .sort((a, b) => {
+      const aDiff = Math.abs((new Date(a.createdAt || 0).getTime()) - resultTime);
+      const bDiff = Math.abs((new Date(b.createdAt || 0).getTime()) - resultTime);
+      return aDiff - bDiff;
+    })[0] || null;
+}
+
+function openSubmittedAnswerModal(encodedEmployeeId) {
+  const employeeId = decodeURIComponent(encodedEmployeeId || "");
+  const user = users.find(u => u.employeeId === employeeId) || {};
+  const latest = getLatestResult(employeeId);
+  if (!latest) {
+    alert("제출 완료된 응시자만 문제세트와 선택 답안을 확인할 수 있습니다.");
+    return;
+  }
+  const log = getSubmissionAnswerLog(employeeId, latest);
+  if (!log || !Array.isArray(log.answerReview) || !log.answerReview.length) {
+    modalRoot.innerHTML = `
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
+        <section class="modal" style="max-width:760px">
+          <h2 id="answerReviewTitle">문제세트/선택 답안</h2>
+          <p class="muted" style="margin:6px 0 14px">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")}</p>
+          <div class="notice warning">이 제출 기록에는 문제세트 상세가 저장되어 있지 않습니다.<br>이 기능 적용 이후 제출된 결과부터 문제별 선택 답안을 확인할 수 있습니다.</div>
+          <div class="modal-actions"><button class="btn primary" type="button" onclick="closeModal()">닫기</button></div>
+        </section>
+      </div>`;
+    return;
+  }
+
+  const rows = log.answerReview.map(item => {
+    const options = (item.options || []).map((opt, idx) => {
+      const marks = [];
+      if (idx === item.selectedDisplayIndex) marks.push("선택");
+      if (idx === item.correctDisplayIndex) marks.push("정답");
+      const badge = marks.length ? ` <strong style="color:${idx === item.correctDisplayIndex ? '#166534' : '#1d4ed8'}">[${marks.join('/')}]</strong>` : "";
+      return `<div style="margin:2px 0">${idx + 1}. ${escapeHtml(opt)}${badge}</div>`;
+    }).join("");
+    const status = item.unanswered
+      ? `<span class="badge warning">미응답</span>`
+      : item.correct
+        ? `<span class="badge success">정답</span>`
+        : `<span class="badge danger">오답</span>`;
+    return `<tr>
+      <td style="text-align:center;font-weight:700">${item.no}</td>
+      <td>${escapeHtml(item.category || "-")}</td>
+      <td><div style="font-weight:700;margin-bottom:6px">${escapeHtml(item.text || "")}</div><div style="font-size:12px;color:var(--muted)">문항ID: ${escapeHtml(String(item.questionId || ""))}</div></td>
+      <td style="min-width:260px">${options}</td>
+      <td>${item.unanswered ? "-" : escapeHtml(item.selectedText || "")}</td>
+      <td>${escapeHtml(item.correctText || "")}</td>
+      <td style="text-align:center">${status}</td>
+    </tr>`;
+  }).join("");
+
+  const summary = log.questionSetSummary || {};
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
+      <section class="modal" style="max-width:min(1180px,96vw);width:96vw;max-height:92vh;overflow:auto">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <h2 id="answerReviewTitle" style="margin-bottom:6px">문제세트/선택 답안</h2>
+            <p class="muted" style="margin:0">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")} · ${escapeHtml(latest.quarter || "")}</p>
+          </div>
+          <button class="btn" type="button" onclick="closeModal()">닫기</button>
+        </div>
+        <div class="metrics-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:12px">
+          <div class="metric-card"><div class="label">점수</div><div class="value">${latest.percentageScore}점</div></div>
+          <div class="metric-card"><div class="label">정답 수</div><div class="value">${latest.correctCount}/${latest.totalCount}</div></div>
+          <div class="metric-card"><div class="label">제출일시</div><div class="value" style="font-size:16px">${formatDateTime(latest.submittedAt)}</div></div>
+          <div class="metric-card"><div class="label">문제 카테고리</div><div class="value" style="font-size:14px">${escapeHtml((summary.categories || []).join(', ') || '-')}</div></div>
+        </div>
+        <div class="table-wrap" style="max-height:62vh;overflow:auto">
+          <table>
+            <thead>
+              <tr><th>No</th><th>분류</th><th>문제</th><th>보기/표시</th><th>선택답안</th><th>정답</th><th>결과</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </section>
+    </div>`;
+}
+
 function _buildUserRowsHtml(rows) {
   // 중복 제거: employeeId 기준
   const seen = new Set();
@@ -4275,7 +4407,9 @@ function _buildUserRowsHtml(rows) {
     return `<tr style="${disq ? "background:rgba(194,65,12,.06)" : ""}">
       <td><span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;${typeColor}">${escapeHtml(userType)}</span></td>
       <td>${escapeHtml(user.department) || "-"}</td>
-      <td><strong>${escapeHtml(user.name)}</strong></td>
+      <td>${latest
+        ? `<button class="link-button" type="button" style="font-weight:800;text-decoration:underline;text-underline-offset:3px" title="제출 문제세트/선택 답안 보기" onclick="openSubmittedAnswerModal('${encodeURIComponent(user.employeeId)}')">${escapeHtml(user.name)}</button>`
+        : `<strong>${escapeHtml(user.name)}</strong>`}</td>
       <td>${statusBadge}</td>
       <td>${latest ? `<strong>${latest.percentageScore}점</strong>` : "-"}</td>
       <td>${passBadge}</td>
