@@ -1704,7 +1704,7 @@ function getExternalApiBase() {
 }
 
 function isExternalApiRuntime() {
-  return Boolean(getExternalApiBase());
+  return Boolean(getExternalApiBase()) || Boolean(window.supabase);
 }
 
 /* ============================================================
@@ -1715,7 +1715,9 @@ function isExternalApiRuntime() {
 const SUPABASE_URL = "https://wbepxouggbdzebqpndzq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndiZXB4b3VnZ2JkemVicXBuZHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3Nzg5OTAsImV4cCI6MjA5NzM1NDk5MH0.C0-y9QVMHopjPmezMwfqPLBbNn6p1V-FB0h_cyDpM_8";
 
-const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const _sb = window.supabase
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
 
 async function _sha256(text) {
   const enc = new TextEncoder().encode(text);
@@ -1743,6 +1745,8 @@ function _fromExamResultRow(r) {
 }
 
 async function _sbGetAppData() {
+  if (!_sb) throw new Error("Supabase 클라이언트를 불러오지 못했습니다. CDN 또는 네트워크 연결을 확인하세요.");
+
   const [usersRes, qbRes, settingsRes, resultsRes, logsRes, activeRes, affRes] = await Promise.all([
     _sb.from("users").select("*"),
     _sb.from("question_bank").select("*"),
@@ -1752,6 +1756,20 @@ async function _sbGetAppData() {
     _sb.from("active_exams").select("*"),
     _sb.from("affiliations").select("*")
   ]);
+
+  const errors = [
+    ["users", usersRes.error],
+    ["question_bank", qbRes.error],
+    ["exam_settings", settingsRes.error],
+    ["exam_results", resultsRes.error],
+    ["activity_logs", logsRes.error],
+    ["active_exams", activeRes.error],
+    ["affiliations", affRes.error]
+  ].filter(([, error]) => error);
+
+  if (errors.length) {
+    throw new Error("Supabase 데이터 조회 실패: " + errors.map(([table, error]) => table + " - " + (error.message || error.code || error)).join(" / "));
+  }
 
   const s = settingsRes.data || {};
 
@@ -2195,13 +2213,15 @@ function loadRemoteData(done) {
     callExternalApi("getAppData")
       .then(data => { applyRemoteData(data); state._remoteLoaded = true; done(true); })
       .catch(error => {
-        console.warn("외부 API 연결에 실패했습니다. 브라우저 저장소로 전환합니다.", error);
+        console.error("Supabase 데이터 로드에 실패했습니다.", error);
+        state.loginError = "데이터베이스 연결에 실패했습니다. 네트워크 또는 Supabase 권한 설정을 확인해 주세요.";
         loadPersistentData();
         done(false);
       });
     return;
   }
 
+  state.loginError = "Supabase 클라이언트를 사용할 수 없습니다. 인터넷 연결 또는 CDN 로딩을 확인해 주세요.";
   done(false);
 }
 
