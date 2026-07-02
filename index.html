@@ -1638,6 +1638,7 @@ function upsertActiveExamRecord(exam, extra = {}) {
   const index = activeExams.findIndex(item => item.key === key);
   if (index >= 0) activeExams[index] = { ...activeExams[index], ...record };
   else activeExams.push(record);
+  return record;
 }
 
 function clearActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
@@ -1647,13 +1648,15 @@ function clearActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
 
 function persistCurrentExam(saveRemote = true) {
   if (!state.currentExam) return;
-  upsertActiveExamRecord(state.currentExam);
+  const record = upsertActiveExamRecord(state.currentExam);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations }));
   } catch (error) {
     console.warn("진행 중 시험 저장에 실패했습니다.", error);
   }
-  if (saveRemote) queueRemoteSave();
+  if (saveRemote && record) {
+    saveActiveExamRecord(record).catch(error => console.warn("진행 중 시험 원격 저장에 실패했습니다.", error));
+  }
 }
 
 function mergeLocalActiveExams() {
@@ -1920,6 +1923,42 @@ async function _sbSaveAppData(snapshot) {
   }
 }
 
+async function _sbSaveActiveExamData(record) {
+  try {
+    if (!record?.key) return { ok: true };
+    const { key, ...rest } = record;
+    const { error } = await _sb.from("active_exams").upsert(
+      {
+        key,
+        employee_id: rest.employeeId || key?.split("__")?.[0] || "",
+        quarter: rest.quarter || key?.split("__")?.[1] || "",
+        snapshot: rest
+      },
+      { onConflict: "key" }
+    );
+    if (error) throw error;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
+async function _sbInsertActivityLogData(log) {
+  try {
+    if (!log) return { ok: true };
+    const { error } = await _sb.from("activity_logs").insert({
+      log_id: String(log.logId || makeLogId()),
+      employee_id: log.employeeId || "",
+      action: log.type || log.action || "",
+      detail: JSON.stringify(log)
+    });
+    if (error) throw error;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
 async function _sbAppendExamSubmission(result, log) {
   try {
     const { data: existing, error: existingError } = await _sb
@@ -1971,7 +2010,13 @@ async function _sbAppendExamSubmission(result, log) {
       started_at: result.startedAt || null,
       submitted_at: result.submittedAt || null
     });
-    if (insertError) throw insertError;
+    if (insertError) {
+      const duplicate = insertError.code === "23505" || /duplicate key|unique/i.test(insertError.message || "");
+      if (duplicate) {
+        return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
+      }
+      throw insertError;
+    }
 
     if (log) {
       const { error: logError } = await _sb.from("activity_logs").insert({
@@ -2072,6 +2117,12 @@ async function callExternalApi(action, payload = {}) {
       break;
     case "saveAppData":
       result = { ok: true, data: await _sbSaveAppData(payload) };
+      break;
+    case "saveActiveExamData":
+      result = { ok: true, data: await _sbSaveActiveExamData(payload.record || payload) };
+      break;
+    case "insertActivityLogData":
+      result = { ok: true, data: await _sbInsertActivityLogData(payload.log || payload) };
       break;
     case "appendExamSubmission":
       result = { ok: true, data: await _sbAppendExamSubmission(payload.result, payload.log) };
@@ -2254,6 +2305,20 @@ async function _sendExamSubmissionOnce(result, log) {
   }
 
   return { ok: true, localOnly: true };
+}
+
+async function saveActiveExamRecord(record) {
+  if (!record || !isExternalApiRuntime()) return { ok: true, localOnly: true };
+  const res = await callExternalApi("saveActiveExamData", { record });
+  if (res?.ok === false) throw new Error(res.message || "진행 중 시험 저장 실패");
+  return res || { ok: true };
+}
+
+async function saveActivityLog(log) {
+  if (!log || !isExternalApiRuntime()) return { ok: true, localOnly: true };
+  const res = await callExternalApi("insertActivityLogData", { log });
+  if (res?.ok === false) throw new Error(res.message || "로그 저장 실패");
+  return res || { ok: true };
 }
 
 async function appendResultToSheet(result, log) {
@@ -3107,7 +3172,7 @@ function handlePreExamVisibility() {
     const user = state.currentUser;
     if (!user) return;
     const createdAt = new Date().toISOString();
-    activityLogs.push({
+    const log = {
       logId: makeLogId(),
       employeeId: user.employeeId,
       department: user.department,
@@ -3116,8 +3181,10 @@ function handlePreExamVisibility() {
       message: "응시확인 체크 후 시험 시작 전 화면 이탈 감지",
       tabSwitchCount: 0,
       createdAt
-    });
-    savePersistentData();
+    };
+    activityLogs.push(log);
+    overwriteLocalCache();
+    saveActivityLog(log).catch(error => console.warn("응시확인 이탈 로그 저장 실패", error));
   }
 }
 
@@ -3229,14 +3296,16 @@ function registerExamExitViolation(source = "exit") {
     ? `페이지 이탈 누적 ${count}회: 재접속 시 자동 제출 및 실격 처리됩니다.`
     : `페이지 이탈 ${count}회 감지: 재접속 후 누적됩니다.`;
   state.currentExam.warningLogs.push({ at: createdAt, source, message });
-  activityLogs.push({
+  const log = {
     logId: makeLogId(),
     employeeId: state.currentUser.employeeId,
     department: state.currentUser.department,
     name: state.currentUser.name,
     type: count >= examSettings.tabSwitchLimit ? "DISQUALIFIED" : "WARNING",
     message, tabSwitchCount: count, createdAt
-  });
+  };
+  activityLogs.push(log);
+  saveActivityLog(log).catch(error => console.warn("이탈 로그 저장 실패", error));
   if (count >= examSettings.tabSwitchLimit) {
     state.currentExam.disqualified = true;
     state.currentExam.disqualificationReason = `탭 전환 ${examSettings.tabSwitchLimit}회 이상`;
@@ -3261,14 +3330,16 @@ function handleTabSwitchViolation(source = "unknown") {
 
   const createdAt = new Date().toISOString();
   state.currentExam.warningLogs.push({ at: createdAt, source, message });
-  activityLogs.push({
+  const log = {
     logId: makeLogId(),
     employeeId: state.currentUser.employeeId,
     department: state.currentUser.department,
     name: state.currentUser.name,
     type: count >= examSettings.tabSwitchLimit ? "DISQUALIFIED" : "WARNING",
     message, tabSwitchCount: count, createdAt
-  });
+  };
+  activityLogs.push(log);
+  saveActivityLog(log).catch(error => console.warn("탭 전환 로그 저장 실패", error));
 
   persistCurrentExam();
 
@@ -3559,7 +3630,7 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
     examResults.push(result);
     activityLogs.push(submitLog);
     clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
-    savePersistentData();
+    overwriteLocalCache();
     const saveResult = await appendResultToSheet(result, submitLog);
     if (!saveResult.ok && saveResult.pending) {
       alert(saveResult.message);
