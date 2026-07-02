@@ -4255,6 +4255,14 @@ function _getUserType(user) {
 }
 
 
+function getQuestionBankSource(questionId) {
+  return questionBank.find(q => String(q.id) === String(questionId)) || null;
+}
+
+function getQuestionBankOptions(source) {
+  return source && Array.isArray(source.options) ? source.options.slice() : [];
+}
+
 function getSubmissionAnswerLog(employeeId, result) {
   const resultTime = result?.submittedAt ? new Date(result.submittedAt).getTime() : 0;
   const submitTypes = new Set(["SUBMIT", "AUTO_SUBMIT", "DISQUALIFIED_SUBMIT"]);
@@ -4270,7 +4278,86 @@ function getSubmissionAnswerLog(employeeId, result) {
     })[0] || null;
 }
 
-function openSubmittedAnswerModal(encodedEmployeeId) {
+async function fetchSubmissionAnswerLogFromDb(employeeId, result) {
+  if (!_sb || !employeeId) return null;
+  try {
+    const { data, error } = await _sb
+      .from("activity_logs")
+      .select("log_id, employee_id, action, detail, created_at")
+      .eq("employee_id", employeeId)
+      .in("action", ["SUBMIT", "AUTO_SUBMIT", "DISQUALIFIED_SUBMIT"])
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+
+    const resultTime = result?.submittedAt ? new Date(result.submittedAt).getTime() : 0;
+    return (data || []).map(row => {
+      let detail = {};
+      try { detail = row.detail ? JSON.parse(row.detail) : {}; } catch (e) { detail = {}; }
+      return {
+        logId: detail.logId || row.log_id,
+        employeeId: row.employee_id,
+        type: detail.type || row.action || "",
+        quarter: detail.quarter || "",
+        createdAt: detail.createdAt || row.created_at,
+        answerReview: Array.isArray(detail.answerReview) ? detail.answerReview : [],
+        questionSetSummary: detail.questionSetSummary || null,
+        rawDetail: detail
+      };
+    }).filter(log => Array.isArray(log.answerReview) && log.answerReview.length)
+      .filter(log => !result?.quarter || !log.quarter || log.quarter === result.quarter)
+      .sort((a, b) => {
+        const aDiff = Math.abs((new Date(a.createdAt || 0).getTime()) - resultTime);
+        const bDiff = Math.abs((new Date(b.createdAt || 0).getTime()) - resultTime);
+        return aDiff - bDiff;
+      })[0] || null;
+  } catch (err) {
+    console.warn("문제세트 제출 로그 조회 실패", err);
+    return null;
+  }
+}
+
+function normalizeAnswerReviewFromQuestionBank(log) {
+  if (!log || !Array.isArray(log.answerReview)) return [];
+  return log.answerReview.map((item, idx) => {
+    const source = getQuestionBankSource(item.questionId);
+    const sourceOptions = getQuestionBankOptions(source);
+    const storedOptions = Array.isArray(item.options) ? item.options.slice() : [];
+    const options = storedOptions.length ? storedOptions : sourceOptions;
+
+    let correctDisplayIndex = Number.isInteger(item.correctDisplayIndex) ? item.correctDisplayIndex : -1;
+    if (correctDisplayIndex < 0 && source) {
+      const correctOriginal = Number(source.answerIndex);
+      const correctText = sourceOptions[correctOriginal - 1];
+      correctDisplayIndex = options.findIndex(opt => String(opt) === String(correctText));
+    }
+
+    const selectedDisplayIndex = Number.isInteger(item.selectedDisplayIndex) ? item.selectedDisplayIndex : null;
+    const selectedText = selectedDisplayIndex === null || selectedDisplayIndex === undefined
+      ? ""
+      : (options[selectedDisplayIndex] || item.selectedText || "");
+    const correctText = correctDisplayIndex >= 0
+      ? (options[correctDisplayIndex] || item.correctText || "")
+      : (item.correctText || "");
+
+    return {
+      no: item.no || idx + 1,
+      questionId: item.questionId,
+      category: source?.category || item.category || "",
+      text: source?.text || item.text || "",
+      options,
+      selectedDisplayIndex,
+      selectedText,
+      correctDisplayIndex,
+      correctText,
+      correct: selectedDisplayIndex !== null && selectedDisplayIndex !== undefined && correctDisplayIndex >= 0 && selectedDisplayIndex === correctDisplayIndex,
+      unanswered: selectedDisplayIndex === null || selectedDisplayIndex === undefined,
+      questionBankFound: !!source
+    };
+  });
+}
+
+async function openSubmittedAnswerModal(encodedEmployeeId) {
   const employeeId = decodeURIComponent(encodedEmployeeId || "");
   const user = users.find(u => u.employeeId === employeeId) || {};
   const latest = getLatestResult(employeeId);
@@ -4278,21 +4365,37 @@ function openSubmittedAnswerModal(encodedEmployeeId) {
     alert("제출 완료된 응시자만 문제세트와 선택 답안을 확인할 수 있습니다.");
     return;
   }
-  const log = getSubmissionAnswerLog(employeeId, latest);
-  if (!log || !Array.isArray(log.answerReview) || !log.answerReview.length) {
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
+      <section class="modal" style="max-width:760px">
+        <h2 id="answerReviewTitle">문제세트/선택 답안</h2>
+        <p class="muted" style="margin:6px 0 14px">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")}</p>
+        <div class="notice">데이터베이스에서 제출 상세와 문제은행을 조회하는 중입니다.</div>
+      </section>
+    </div>`;
+
+  let log = getSubmissionAnswerLog(employeeId, latest);
+  if (!log) log = await fetchSubmissionAnswerLogFromDb(employeeId, latest);
+  const answerReview = normalizeAnswerReviewFromQuestionBank(log);
+
+  if (!answerReview.length) {
     modalRoot.innerHTML = `
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
-        <section class="modal" style="max-width:760px">
+        <section class="modal" style="max-width:820px">
           <h2 id="answerReviewTitle">문제세트/선택 답안</h2>
           <p class="muted" style="margin:6px 0 14px">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")}</p>
-          <div class="notice warning">이 제출 기록에는 문제세트 상세가 저장되어 있지 않습니다.<br>이 기능 적용 이후 제출된 결과부터 문제별 선택 답안을 확인할 수 있습니다.</div>
+          <div class="notice warning">
+            문제 원본은 <strong>question_bank</strong>에 있지만, 응시자별로 어떤 문제 ID가 출제됐고 어떤 답을 골랐는지는 제출 시점에 별도로 저장돼야 합니다.<br>
+            이 제출 기록에는 그 상세 로그가 없어 과거 결과는 복원할 수 없습니다. 이 파일 적용 이후 새로 제출한 결과부터 확인됩니다.
+          </div>
           <div class="modal-actions"><button class="btn primary" type="button" onclick="closeModal()">닫기</button></div>
         </section>
       </div>`;
     return;
   }
 
-  const rows = log.answerReview.map(item => {
+  const rows = answerReview.map(item => {
     const options = (item.options || []).map((opt, idx) => {
       const marks = [];
       if (idx === item.selectedDisplayIndex) marks.push("선택");
@@ -4308,7 +4411,7 @@ function openSubmittedAnswerModal(encodedEmployeeId) {
     return `<tr>
       <td style="text-align:center;font-weight:700">${item.no}</td>
       <td>${escapeHtml(item.category || "-")}</td>
-      <td><div style="font-weight:700;margin-bottom:6px">${escapeHtml(item.text || "")}</div><div style="font-size:12px;color:var(--muted)">문항ID: ${escapeHtml(String(item.questionId || ""))}</div></td>
+      <td><div style="font-weight:700;margin-bottom:6px">${escapeHtml(item.text || "")}</div><div style="font-size:12px;color:var(--muted)">문항ID: ${escapeHtml(String(item.questionId || ""))}${item.questionBankFound ? " · question_bank 조회" : " · 저장 로그 기준"}</div></td>
       <td style="min-width:260px">${options}</td>
       <td>${item.unanswered ? "-" : escapeHtml(item.selectedText || "")}</td>
       <td>${escapeHtml(item.correctText || "")}</td>
@@ -4316,7 +4419,8 @@ function openSubmittedAnswerModal(encodedEmployeeId) {
     </tr>`;
   }).join("");
 
-  const summary = log.questionSetSummary || {};
+  const summary = log?.questionSetSummary || {};
+  const categories = Array.from(new Set(answerReview.map(item => item.category).filter(Boolean)));
   modalRoot.innerHTML = `
     <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
       <section class="modal" style="max-width:min(1180px,96vw);width:96vw;max-height:92vh;overflow:auto">
@@ -4324,6 +4428,7 @@ function openSubmittedAnswerModal(encodedEmployeeId) {
           <div>
             <h2 id="answerReviewTitle" style="margin-bottom:6px">문제세트/선택 답안</h2>
             <p class="muted" style="margin:0">${escapeHtml(user.department || latest.department || "")} ${escapeHtml(user.name || latest.name || "")} · ${escapeHtml(latest.quarter || "")}</p>
+            <p class="muted" style="margin:6px 0 0;font-size:12px">문제 본문/보기/정답은 question_bank 기준으로 조회하고, 선택 답안은 제출 로그 기준으로 표시합니다.</p>
           </div>
           <button class="btn" type="button" onclick="closeModal()">닫기</button>
         </div>
@@ -4331,7 +4436,7 @@ function openSubmittedAnswerModal(encodedEmployeeId) {
           <div class="metric-card"><div class="label">점수</div><div class="value">${latest.percentageScore}점</div></div>
           <div class="metric-card"><div class="label">정답 수</div><div class="value">${latest.correctCount}/${latest.totalCount}</div></div>
           <div class="metric-card"><div class="label">제출일시</div><div class="value" style="font-size:16px">${formatDateTime(latest.submittedAt)}</div></div>
-          <div class="metric-card"><div class="label">문제 카테고리</div><div class="value" style="font-size:14px">${escapeHtml((summary.categories || []).join(', ') || '-')}</div></div>
+          <div class="metric-card"><div class="label">문제 카테고리</div><div class="value" style="font-size:14px">${escapeHtml((summary.categories || categories).join(', ') || '-')}</div></div>
         </div>
         <div class="table-wrap" style="max-height:62vh;overflow:auto">
           <table>
