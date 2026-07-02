@@ -1771,7 +1771,6 @@ async function _sbSaveAppData(snapshot) {
       const rows = snapshot.questionBank.map((q) => ({
         id: q.id ?? null,
         category: q.category || "",
-        difficulty: q.difficulty || "기본",
         text: q.text || "",
         option_1: (q.options || [])[0] || "",
         option_2: (q.options || [])[1] || "",
@@ -2833,7 +2832,6 @@ function generateExamQuestions() {
     return {
       questionId: question.id,
       category: question.category,
-      difficulty: question.difficulty,
       text: question.text,
       options: displayOptions.map(option => option.text),
       correctDisplayIndex
