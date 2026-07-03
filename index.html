@@ -2160,78 +2160,28 @@ async function _sbInsertActivityLogData(log) {
 
 async function _sbAppendExamSubmission(result, log) {
   try {
-    const { data: existing, error: existingError } = await _sb
-      .from("exam_results")
-      .select("result_id")
-      .eq("employee_id", result.employeeId)
-      .eq("quarter", result.quarter)
-      .maybeSingle();
-
-    if (existingError) throw existingError;
-
-    if (existing) {
-      const now = new Date().toISOString();
-      const logId = makeLogId();
-      const duplicateLog = {
-        log_id: logId,
-        employee_id: result.employeeId,
-        action: "SUBMIT_SKIPPED_DUPLICATE",
-        detail: JSON.stringify({
-          logId,
-          employeeId: result.employeeId,
-          department: result.department || "",
-          name: result.name || "",
-          type: "SUBMIT_SKIPPED_DUPLICATE",
-          message: "이미 같은 분기에 제출한 결과가 있어 중복 제출을 저장하지 않았습니다.",
-          createdAt: now
-        })
-      };
-
-      const { error: dupLogError } = await _sb.from("activity_logs").insert(duplicateLog);
-      if (dupLogError) console.warn("중복 제출 로그 저장 실패", dupLogError);
-
-      return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
-    }
-
-    const { error: insertError } = await _sb.from("exam_results").insert({
-      result_id: result.resultId,
-      employee_id: result.employeeId,
-      department: result.department || "",
-      name: result.name || "",
-      quarter: result.quarter || "",
-      percentage_score: result.percentageScore ?? 0,
-      correct_count: result.correctCount ?? 0,
-      total_count: result.totalCount ?? 0,
-      passed: !!result.passed,
-      disqualified: !!result.disqualified,
-      disqualification_reason: result.disqualificationReason || "",
-      tab_switch_count: result.tabSwitchCount ?? 0,
-      started_at: result.startedAt || null,
-      submitted_at: result.submittedAt || null
+    const { data, error } = await _sb.rpc("submit_exam_once", {
+      p_result_id: result.resultId,
+      p_employee_id: result.employeeId,
+      p_department: result.department || "",
+      p_name: result.name || "",
+      p_quarter: result.quarter || "",
+      p_percentage_score: result.percentageScore ?? 0,
+      p_correct_count: result.correctCount ?? 0,
+      p_total_count: result.totalCount ?? 0,
+      p_passed: !!result.passed,
+      p_disqualified: !!result.disqualified,
+      p_disqualification_reason: result.disqualificationReason || "",
+      p_tab_switch_count: result.tabSwitchCount ?? 0,
+      p_started_at: result.startedAt || null,
+      p_submitted_at: result.submittedAt || null,
+      p_log_id: String(log?.logId || makeLogId()),
+      p_log_action: log?.type || log?.action || "exam_submit",
+      p_log_detail: log || {}
     });
-    if (insertError) {
-      const duplicate = insertError.code === "23505" || /duplicate key|unique/i.test(insertError.message || "");
-      if (duplicate) {
-        return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
-      }
-      throw insertError;
-    }
 
-    if (log) {
-      const { error: logError } = await _sb.from("activity_logs").insert({
-        log_id: String(log.logId || makeLogId()),
-        employee_id: result.employeeId,
-        action: log.type || log.action || "exam_submit",
-        detail: JSON.stringify(log)
-      });
-      if (logError) throw logError;
-    }
-
-    const key = result.employeeId + "__" + result.quarter;
-    const { error: activeDeleteError } = await _sb.from("active_exams").delete().eq("key", key);
-    if (activeDeleteError) throw activeDeleteError;
-
-    return { ok: true };
+    if (error) throw error;
+    return data || { ok: true };
   } catch (err) {
     return { ok: false, message: err.message || String(err) };
   }
