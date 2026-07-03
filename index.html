@@ -1494,6 +1494,7 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 720px) { .admin-recent-row { grid-template-columns:1fr 80px; } .admin-recent-row .recent-pass { text-align:left; } }
 
 @media (max-width: 720px) { .result-profile-chips { justify-content:center; } }
+.v2-sync-status{align-items:center;min-height:24px;border-radius:999px;padding:0 9px;font-size:11px;font-weight:900;white-space:nowrap}.v2-sync-ok{background:#ecfdf5;color:#047857;border:1px solid #bbf7d0}.v2-sync-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
 </style>
 </head>
 <body>
@@ -1833,7 +1834,16 @@ function persistCurrentExam(saveRemote = true) {
   if (!state.currentExam) return;
   const record = upsertActiveExamRecord(state.currentExam);
   if (saveRemote && record) {
-    saveActiveExamRecord(record).catch(error => console.warn("진행 중 시험 서버 저장에 실패했습니다.", error));
+    saveActiveExamRecord(record)
+      .then(() => {
+        state.examSaveError = "";
+        updateExamSyncStatus("서버 저장 완료", false);
+      })
+      .catch(error => {
+        state.examSaveError = error.message || String(error) || "진행 중 시험 저장 실패";
+        updateExamSyncStatus("답안 저장 실패 - 네트워크를 확인해 주세요", true);
+        console.error("진행 중 시험 서버 저장에 실패했습니다.", error);
+      });
   }
 }
 
@@ -3278,6 +3288,7 @@ function generateExamQuestions() {
       category: question.category,
       text: question.text,
       options: displayOptions.map(option => option.text),
+      optionOriginalIndexes: displayOptions.map(option => option.originalIndex),
       correctDisplayIndex
     };
   });
@@ -3556,6 +3567,7 @@ function renderExamScreen() {
           <span class="v2-exam-timer" id="remainingTime">${formatRemainingTime(state.remainingSeconds)}</span>
         </div>
         <div class="v2-exam-bar-right">
+          <span id="examSyncStatus" class="v2-sync-status ${state.examSaveError ? "v2-sync-error" : "v2-sync-ok"}" style="${state.examSaveError ? "display:inline-flex" : "display:none"}">${state.examSaveError ? escapeHtml(state.examSaveError) : ""}</span>
           <span class="v2-exam-progress-text">${answeredCount}/${exam.questions.length}</span>
 
         </div>
@@ -3566,6 +3578,7 @@ function renderExamScreen() {
     </div>
 
     <main class="container v2-exam-container">
+      ${state.examSaveError ? `<div class="notice danger" style="margin-bottom:12px">답안 저장 실패: ${escapeHtml(state.examSaveError)}<br>네트워크 또는 서버 연결을 확인한 뒤 계속 응시해 주세요. 제출 시 서버 저장 완료 전에는 결과 화면으로 이동하지 않습니다.</div>` : ""}
       ${questionsHtml}
       <div class="v2-submit-bottom">
         <button class="btn v2-submit-final-btn" id="bottomSubmitBtn" type="button"
@@ -3692,49 +3705,70 @@ function closeModal() { modalRoot.innerHTML = ""; }
 
 /* ─── 채점 & 제출 ─────────────────────────────── */
 function calculateScore(exam) {
-  const total        = exam.questions.length;
-  const correctCount = exam.questions.reduce((sum, question, index) =>
-    sum + (exam.answers[index] === question.correctDisplayIndex ? 1 : 0), 0);
-  const totalScore       = correctCount * examSettings.pointsPerQuestion;
-  const maxScore         = total * examSettings.pointsPerQuestion;
-  const percentageScore  = Math.round((totalScore / maxScore) * 100);
-  const disqualified     = Boolean(exam.disqualified);
+  const review = buildAnswerReview(exam);
+  const total = review.length;
+  const correctCount = review.filter(item => item.correct).length;
+  const totalScore = correctCount * examSettings.pointsPerQuestion;
+  const maxScore = total * examSettings.pointsPerQuestion;
+  const percentageScore = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+  const disqualified = Boolean(exam.disqualified);
   return {
     correctCount, totalCount: total, totalScore, maxScore, percentageScore,
     score: percentageScore,
     passed: !disqualified && percentageScore >= examSettings.passingScore,
     disqualified
   };
-
-  // 합격 시 폭죽 애니메이션
-  if (passed) {
-    requestAnimationFrame(() => launchConfetti());
-  }
 }
 
+
+function getLatestCorrectDisplayIndex(question) {
+  const source = getQuestionBankSource(question?.questionId);
+  const correctOriginal = source ? Number(source.answerIndex) : null;
+  const order = Array.isArray(question?.optionOriginalIndexes) ? question.optionOriginalIndexes.map(Number) : [];
+  if (Number.isInteger(correctOriginal) && order.length) {
+    const idx = order.findIndex(n => n === correctOriginal);
+    if (idx >= 0) return idx;
+  }
+  if (source && Array.isArray(source.options) && Array.isArray(question?.options)) {
+    const correctText = source.options[correctOriginal];
+    const byText = question.options.findIndex(opt => String(opt) === String(correctText));
+    if (byText >= 0) return byText;
+  }
+  return Number.isInteger(question?.correctDisplayIndex) ? question.correctDisplayIndex : -1;
+}
 
 function buildAnswerReview(exam) {
   if (!exam || !Array.isArray(exam.questions)) return [];
   return exam.questions.map((question, index) => {
     const selectedDisplayIndex = exam.answers?.[index];
+    const optionOriginalIndexes = Array.isArray(question.optionOriginalIndexes) ? question.optionOriginalIndexes.slice() : [];
     const selectedText = selectedDisplayIndex === null || selectedDisplayIndex === undefined
       ? ""
       : (question.options?.[selectedDisplayIndex] || "");
-    const correctDisplayIndex = question.correctDisplayIndex;
-    const correctText = correctDisplayIndex === null || correctDisplayIndex === undefined
+    const correctDisplayIndex = getLatestCorrectDisplayIndex(question);
+    const correctText = correctDisplayIndex === null || correctDisplayIndex === undefined || correctDisplayIndex < 0
       ? ""
       : (question.options?.[correctDisplayIndex] || "");
+    const source = getQuestionBankSource(question.questionId);
+    const correctOriginalOption = source ? Number(source.answerIndex) : null;
+    const selectedOriginalOption = selectedDisplayIndex === null || selectedDisplayIndex === undefined
+      ? null
+      : (optionOriginalIndexes.length ? optionOriginalIndexes[selectedDisplayIndex] : selectedDisplayIndex);
+    const isCorrect = selectedDisplayIndex !== null && selectedDisplayIndex !== undefined && correctDisplayIndex >= 0 && selectedDisplayIndex === correctDisplayIndex;
     return {
       no: index + 1,
       questionId: question.questionId,
       category: question.category || "",
       text: question.text || "",
       options: Array.isArray(question.options) ? question.options.slice() : [],
+      optionOriginalIndexes,
       selectedDisplayIndex: selectedDisplayIndex,
+      selectedOriginalOption,
       selectedText,
       correctDisplayIndex,
+      correctOriginalOption,
       correctText,
-      correct: selectedDisplayIndex !== null && selectedDisplayIndex !== undefined && selectedDisplayIndex === correctDisplayIndex,
+      correct: isCorrect,
       unanswered: selectedDisplayIndex === null || selectedDisplayIndex === undefined
     };
   });
@@ -3777,6 +3811,14 @@ function hideSubmitBuffer() {
   const root = document.getElementById("submitBufferRoot");
   if (root) root.innerHTML = "";
 }
+function updateExamSyncStatus(message, isError = false) {
+  const el = document.getElementById("examSyncStatus");
+  if (!el) return;
+  el.className = isError ? "v2-sync-status v2-sync-error" : "v2-sync-status v2-sync-ok";
+  el.textContent = message || "";
+  el.style.display = message ? "inline-flex" : "none";
+}
+
 
 function retrySubmitExamFromBuffer() {
   hideSubmitBuffer();
@@ -3903,13 +3945,14 @@ function renderResultScreen() {
         .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0]
     : null;
 
-  const result = state.lastResult || serverResult;
-  if (!result) {
+  const rawResult = state.lastResult || serverResult;
+  if (!rawResult) {
     state.view = "candidate";
     renderCandidateDashboard();
     return;
   }
   if (serverResult && !state.lastResult) state.lastResult = serverResult;
+  const result = getRegradedResult(rawResult);
   const passed   = result.passed && !result.disqualified;
   const label    = result.disqualified ? "실격" : (passed ? "합격" : "불합격");
   const cls      = passed ? "success" : "danger";
@@ -4230,14 +4273,16 @@ function renderAdminHome() {
       <section class="card">
         <div class="section-head"><h3>최근 응시 기록</h3></div>
         <div class="admin-recent-list">
-          ${recent.map(r => `
+          ${recent.map(raw => {
+            const r = getRegradedResult(raw);
+            return `
             <div class="admin-recent-row">
               <span class="recent-dept" title="${escapeHtml(r.department)}">${escapeHtml(r.department)}</span>
               <span class="recent-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
               <span class="recent-score">${r.percentageScore}점</span>
               <span class="recent-pass">${renderResultBadge(r)}</span>
-            </div>
-          `).join("") || `<div class="empty">최근 응시 기록이 없습니다.</div>`}
+            </div>`;
+          }).join("") || `<div class="empty">최근 응시 기록이 없습니다.</div>`}
         </div>
       </section>
 
@@ -4272,7 +4317,7 @@ function renderAdminHome() {
                 const quarters = [...new Set(examResults.map(r => r.quarter))].sort((a,b) => String(b).localeCompare(String(a), "ko"));
                 if (!quarters.length) return `<tr><td colspan="7" class="empty">응시 기록이 없습니다.</td></tr>`;
                 return quarters.map(q => {
-                  const rows = examResults.filter(r => r.quarter === q);
+                  const rows = examResults.filter(r => r.quarter === q).map(getRegradedResult);
                   const passed = rows.filter(r => r.passed && !r.disqualified).length;
                   const failed = rows.filter(r => !r.passed && !r.disqualified).length;
                   const disq   = rows.filter(r => r.disqualified).length;
@@ -4300,7 +4345,7 @@ function renderAdminHome() {
 function getDashboardMetrics() {
   const quarter        = getCurrentQuarter();
   const totalCandidates = getCandidateUsers().length;
-  const currentResults = examResults.filter(r => r.quarter === quarter);
+  const currentResults = examResults.filter(r => r.quarter === quarter).map(getRegradedResult);
   const completed      = new Set(currentResults.map(r => r.employeeId)).size;
   const pending        = totalCandidates - completed;
   const nonDisqualified = currentResults.filter(r => !r.disqualified);
@@ -4330,7 +4375,7 @@ function getScoreDistribution(results) {
   ];
   return ranges.map(range => ({
     label: range.label,
-    value: results.filter(r => r.percentageScore >= range.min && r.percentageScore <= range.max).length
+    value: results.map(getRegradedResult).filter(r => r.percentageScore >= range.min && r.percentageScore <= range.max).length
   }));
 }
 
@@ -4352,8 +4397,9 @@ function renderBarChart(items) {
 }
 
 function renderResultBadge(result) {
-  if (result.disqualified) return `<span class="pass-circle disq">실격</span>`;
-  return `<span class="pass-circle ${result.passed ? "pass" : "fail"}">${result.passed ? "합격" : "불합격"}</span>`;
+  const r = getRegradedResult(result) || result;
+  if (r.disqualified) return `<span class="pass-circle disq">실격</span>`;
+  return `<span class="pass-circle ${r.passed ? "pass" : "fail"}">${r.passed ? "합격" : "불합격"}</span>`;
 }
 
 function adminRefreshData() {
@@ -4459,21 +4505,36 @@ function normalizeAnswerReviewFromQuestionBank(log) {
     const sourceOptions = getQuestionBankOptions(source);
     const storedOptions = Array.isArray(item.options) ? item.options.slice() : [];
     const options = storedOptions.length ? storedOptions : sourceOptions;
-
-    let correctDisplayIndex = Number.isInteger(item.correctDisplayIndex) ? item.correctDisplayIndex : -1;
-    if (correctDisplayIndex < 0 && source) {
-      const correctOriginal = Number(source.answerIndex);
-      const correctText = sourceOptions[correctOriginal - 1];
-      correctDisplayIndex = options.findIndex(opt => String(opt) === String(correctText));
-    }
+    const optionOriginalIndexes = Array.isArray(item.optionOriginalIndexes) ? item.optionOriginalIndexes.map(Number) : [];
 
     const selectedDisplayIndex = Number.isInteger(item.selectedDisplayIndex) ? item.selectedDisplayIndex : null;
+    const selectedOriginalOption = selectedDisplayIndex === null || selectedDisplayIndex === undefined
+      ? (item.selectedOriginalOption ?? null)
+      : (optionOriginalIndexes.length ? optionOriginalIndexes[selectedDisplayIndex] : (item.selectedOriginalOption ?? selectedDisplayIndex));
+
+    let correctDisplayIndex = -1;
+    let correctOriginalOption = item.correctOriginalOption ?? null;
+    if (source) {
+      correctOriginalOption = Number(source.answerIndex);
+      if (optionOriginalIndexes.length) {
+        correctDisplayIndex = optionOriginalIndexes.findIndex(n => Number(n) === correctOriginalOption);
+      }
+      if (correctDisplayIndex < 0 && sourceOptions.length && options.length) {
+        const correctTextFromBank = sourceOptions[correctOriginalOption];
+        correctDisplayIndex = options.findIndex(opt => String(opt) === String(correctTextFromBank));
+      }
+    }
+    if (correctDisplayIndex < 0 && Number.isInteger(item.correctDisplayIndex)) {
+      correctDisplayIndex = item.correctDisplayIndex;
+    }
+
     const selectedText = selectedDisplayIndex === null || selectedDisplayIndex === undefined
       ? ""
       : (options[selectedDisplayIndex] || item.selectedText || "");
     const correctText = correctDisplayIndex >= 0
       ? (options[correctDisplayIndex] || item.correctText || "")
       : (item.correctText || "");
+    const isCorrect = selectedDisplayIndex !== null && selectedDisplayIndex !== undefined && correctDisplayIndex >= 0 && selectedDisplayIndex === correctDisplayIndex;
 
     return {
       no: item.no || idx + 1,
@@ -4481,15 +4542,44 @@ function normalizeAnswerReviewFromQuestionBank(log) {
       category: source?.category || item.category || "",
       text: source?.text || item.text || "",
       options,
+      optionOriginalIndexes,
       selectedDisplayIndex,
+      selectedOriginalOption,
       selectedText,
       correctDisplayIndex,
+      correctOriginalOption,
       correctText,
-      correct: selectedDisplayIndex !== null && selectedDisplayIndex !== undefined && correctDisplayIndex >= 0 && selectedDisplayIndex === correctDisplayIndex,
+      correct: isCorrect,
       unanswered: selectedDisplayIndex === null || selectedDisplayIndex === undefined,
       questionBankFound: !!source
     };
   });
+}
+
+function getRegradedResult(result) {
+  if (!result) return result;
+  const log = getSubmissionAnswerLog(result.employeeId, result);
+  const review = normalizeAnswerReviewFromQuestionBank(log);
+  if (!review.length) return { ...result, _regraded: false };
+  const totalCount = review.length;
+  const correctCount = review.filter(item => item.correct).length;
+  const totalScore = correctCount * examSettings.pointsPerQuestion;
+  const maxScore = totalCount * examSettings.pointsPerQuestion;
+  const percentageScore = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+  const disqualified = Boolean(result.disqualified);
+  return {
+    ...result,
+    correctCount,
+    totalCount,
+    totalScore,
+    maxScore,
+    percentageScore,
+    score: percentageScore,
+    passed: !disqualified && percentageScore >= examSettings.passingScore,
+    _regraded: true,
+    _storedPercentageScore: result.percentageScore,
+    _storedCorrectCount: result.correctCount
+  };
 }
 
 async function openSubmittedAnswerModal(encodedEmployeeId) {
@@ -4537,7 +4627,9 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
   const wrongCount = answerReview.filter(item => !item.correct && !item.unanswered).length;
   const unansweredCount = answerReview.filter(item => item.unanswered).length;
   const totalCount = answerReview.length;
-  const passText = latest.disqualified ? "실격" : (latest.passed ? "합격" : "불합격");
+  const liveScore = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+  const livePassed = !latest.disqualified && liveScore >= examSettings.passingScore;
+  const passText = latest.disqualified ? "실격" : (livePassed ? "합격" : "불합격");
   const viewer = [personDept, personName].filter(Boolean).join(" · ") || "-";
 
   const optionList = (item) => (item.options || []).map((opt, idx) => {
@@ -4621,7 +4713,7 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
             <div class="ar-summary-chip"><span class="key">분기</span><span class="val">${escapeHtml(latest.quarter || "-")}</span></div>
             <div class="ar-summary-chip"><span class="key">소속</span><span class="val">${escapeHtml(personDept || "-")}</span></div>
             <div class="ar-summary-chip"><span class="key">성명</span><span class="val">${escapeHtml(personName || "-")}</span></div>
-            <div class="ar-summary-chip"><span class="key">점수</span><span class="val">${latest.percentageScore}점</span></div>
+            <div class="ar-summary-chip"><span class="key">점수</span><span class="val">${liveScore}점</span></div>
           </div>
         </div>
         <div class="ar-body">
@@ -4646,6 +4738,7 @@ function _buildUserRowsHtml(rows) {
     const attempted  = hasAttemptedThisQuarter(user.employeeId);
     const isActive   = !!getActiveExamRecord(user.employeeId);
     const latest     = getLatestResult(user.employeeId);
+    const displayLatest = latest ? getRegradedResult(latest) : null;
     const userType   = _getUserType(user);
     const typeColor  = userType === "이루자" ? "color:#2563eb;background:#eff6ff" : "color:#059669;background:#f0fdf4";
     const tabCount   = latest?.tabSwitchCount ?? (isActive ? (getActiveExamRecord(user.employeeId)?.exam?.tabSwitchCount ?? 0) : 0);
@@ -4660,8 +4753,8 @@ function _buildUserRowsHtml(rows) {
 
     // 합격 여부
     let passBadge = "-";
-    if (latest?.passed != null || latest?.disqualified) {
-      passBadge = renderResultBadge(latest);
+    if (displayLatest?.passed != null || displayLatest?.disqualified) {
+      passBadge = renderResultBadge(displayLatest);
     }
 
     // 이탈 표시
@@ -4695,7 +4788,7 @@ function _buildUserRowsHtml(rows) {
         ? `<button class="link-button" type="button" style="font-weight:800;text-decoration:underline;text-underline-offset:3px" title="제출 문제세트/선택 답안 보기" onclick="openSubmittedAnswerModal('${encodeURIComponent(user.employeeId)}')">${escapeHtml(user.name)}</button>`
         : `<strong>${escapeHtml(user.name)}</strong>`}</td>
       <td>${statusBadge}</td>
-      <td class="fixed-score">${latest ? `<strong>${latest.percentageScore}점</strong>` : "-"}</td>
+      <td class="fixed-score">${displayLatest ? `<strong>${displayLatest.percentageScore}점</strong>` : "-"}</td>
       <td class="fixed-pass">${passBadge}</td>
       <td style="text-align:center" class="${tabCount >= examSettings.tabSwitchLimit ? 'leave-warning' : ''}">${tabBadge}</td>
       <td>${disqBadge}</td>
@@ -5536,7 +5629,10 @@ function renderResultsManager() {
                 <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>합불여부</th><th>자격 유효기간</th><th>탭 전환</th></tr>
               </thead>
               <tbody>
-                ${grouped[quarter].map(r => `
+                ${grouped[quarter].map(raw => {
+                  const r = getRegradedResult(raw);
+                  const validity = getCertificationValidity(r);
+                  return `
                   <tr>
                     <td>${r.startedAt ? formatDateTime(r.startedAt) : "-"}</td>
                     <td>${formatDateTime(r.submittedAt)}</td>
@@ -5546,10 +5642,10 @@ function renderResultsManager() {
                     <td>${r.correctCount}/${r.totalCount}</td>
                     <td class="fixed-score"><strong>${r.percentageScore}점</strong></td>
                     <td class="fixed-pass">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
-                    <td>${getCertificationValidity(r) ? `${formatDateOnly(getCertificationValidity(r).validFrom)} ~ ${formatDateOnly(getCertificationValidity(r).validUntil)}` : "-"}</td>
+                    <td>${validity ? `${formatDateOnly(validity.validFrom)} ~ ${formatDateOnly(validity.validUntil)}` : "-"}</td>
                     <td>${r.tabSwitchCount ?? 0}회</td>
-                  </tr>
-                `).join("")}
+                  </tr>`;
+                }).join("")}
               </tbody>
             </table>
           </div>
@@ -5569,8 +5665,8 @@ function filterResults() {
     return depOk && qOk && disqOk;
   });
 
-  if      (state.filters.resultSort === "scoreDesc") rows.sort((a, b) => b.percentageScore - a.percentageScore);
-  else if (state.filters.resultSort === "scoreAsc")  rows.sort((a, b) => a.percentageScore - b.percentageScore);
+  if      (state.filters.resultSort === "scoreDesc") rows.sort((a, b) => getRegradedResult(b).percentageScore - getRegradedResult(a).percentageScore);
+  else if (state.filters.resultSort === "scoreAsc")  rows.sort((a, b) => getRegradedResult(a).percentageScore - getRegradedResult(b).percentageScore);
   else                                               rows.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
   return rows;
 }
@@ -5590,16 +5686,16 @@ function resetResultFilters() {
 // 책임: 통계 시각화 (점수 분포, 부서별 평균, 합격 비율, 카테고리 문항 수)
 
 function renderStatsManager() {
-  const currentResults = examResults.filter(r => r.quarter === getCurrentQuarter());
+  const currentResults = examResults.filter(r => r.quarter === getCurrentQuarter()).map(getRegradedResult);
   const scoreDist      = getScoreDistribution(examResults);
   const categoryCounts = getCategoryCounts().map(item => ({ label: item.category, value: item.count }));
   const statusRatio    = [
-    { label: "합격",   value: examResults.filter(r =>  r.passed && !r.disqualified).length },
-    { label: "불합격", value: examResults.filter(r => !r.passed && !r.disqualified).length },
-    { label: "실격",   value: examResults.filter(r =>  r.disqualified).length }
+    { label: "합격",   value: examResults.map(getRegradedResult).filter(r =>  r.passed && !r.disqualified).length },
+    { label: "불합격", value: examResults.map(getRegradedResult).filter(r => !r.passed && !r.disqualified).length },
+    { label: "실격",   value: examResults.map(getRegradedResult).filter(r =>  r.disqualified).length }
   ];
   const deptAvg = getDepartments().map(dep => {
-    const rows = examResults.filter(r => r.department === dep);
+    const rows = examResults.filter(r => r.department === dep).map(getRegradedResult);
     const avg  = rows.length ? Math.round(rows.reduce((sum, r) => sum + r.percentageScore, 0) / rows.length) : 0;
     return { label: dep, value: avg };
   });
