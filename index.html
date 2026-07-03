@@ -1435,6 +1435,65 @@ tr:last-child td { border-bottom: 0; }
 }
 
 
+
+
+/* 제출 버퍼 오버레이 */
+.submit-buffer-backdrop { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15,23,42,.42); backdrop-filter: blur(8px); }
+.submit-buffer-card { width: min(420px, 100%); border-radius: 24px; background: #fff; box-shadow: 0 24px 80px rgba(15,23,42,.24); border: 1px solid rgba(226,232,240,.9); padding: 28px; text-align: center; animation: bufferPop .18s ease-out; }
+.submit-buffer-spinner { width: 52px; height: 52px; margin: 2px auto 18px; border-radius: 999px; border: 5px solid #e0ecff; border-top-color: #2563eb; animation: bufferSpin .9s linear infinite; }
+.submit-buffer-title { margin: 0 0 6px; font-size: 24px; line-height: 1.25; font-weight: 900; letter-spacing: -.03em; color: #0f172a; }
+.submit-buffer-sub { margin: 0 0 18px; color: #64748b; font-size: 14px; font-weight: 700; }
+.submit-buffer-status { border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; color: #334155; font-size: 13px; font-weight: 800; line-height: 1.45; }
+.submit-buffer-progress { overflow: hidden; height: 6px; margin-top: 16px; border-radius: 999px; background: #e2e8f0; }
+.submit-buffer-progress span { display: block; width: 36%; height: 100%; border-radius: 999px; background: #2563eb; animation: bufferBar 1.2s ease-in-out infinite; }
+.submit-buffer-error { margin-top: 14px; border-radius: 14px; border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; padding: 12px; font-size: 13px; line-height: 1.45; text-align: left; font-weight: 700; }
+.submit-buffer-actions { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+@keyframes bufferSpin { to { transform: rotate(360deg); } }
+@keyframes bufferBar { 0% { transform: translateX(-110%); } 50% { transform: translateX(90%); } 100% { transform: translateX(250%); } }
+@keyframes bufferPop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.result-profile-chips { position: sticky; top: 0; z-index: 5; margin-bottom: 14px; padding: 0; background: transparent; backdrop-filter: none; }
+.result-profile-chips .v2-chip { background: var(--panel-2); }
+.result-meta-grid { display:none !important; }
+.result-compact-only .v2-result-date { display:none !important; }
+
+.result-compact-only .v2-result-stats { display:flex !important; border-top:1px solid var(--line); background:#fff; }
+.admin-result-table { min-width: 1040px; table-layout: fixed; }
+.admin-result-table th:nth-child(4), .admin-result-table td:nth-child(4) { width: 170px; }
+.admin-result-table th:nth-child(5), .admin-result-table td:nth-child(5) { width: 120px; }
+.admin-result-table th:nth-child(7), .admin-result-table td:nth-child(7) { width: 92px; text-align:center; }
+.admin-result-table th:nth-child(8), .admin-result-table td:nth-child(8) { width: 104px; text-align:center; }
+.pass-circle {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:54px; height:30px; padding:0 10px; border-radius:999px;
+  font-size:12px; font-weight:950; line-height:1; white-space:nowrap;
+  letter-spacing:-.02em; border:1px solid transparent;
+}
+.pass-circle.pass { background:#16a34a; color:#fff; border-color:#15803d; }
+.pass-circle.fail { background:#ef4444; color:#fff; border-color:#dc2626; }
+.pass-circle.disq { background:#f59e0b; color:#fff; border-color:#d97706; }
+.admin-recent-list { display:grid; gap:10px; }
+.admin-recent-row {
+  display:grid; grid-template-columns:minmax(160px, 1.35fr) minmax(90px, .8fr) 78px 72px;
+  align-items:center; gap:12px; padding:10px 12px;
+  border:1px solid var(--line); border-radius:14px; background:var(--panel-2);
+  font-size:13px; line-height:1.35;
+}
+.admin-recent-row .recent-dept { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#475569; font-weight:800; }
+.admin-recent-row .recent-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#0f172a; font-weight:950; }
+.admin-recent-row .recent-score { text-align:center; font-weight:950; color:#1e293b; }
+.admin-recent-row .recent-pass { text-align:center; }
+.admin-table-fixed th, .admin-table-fixed td { font-size:13px; font-weight:800; vertical-align:middle; }
+.admin-table-fixed th { font-weight:950; color:#334155; }
+.admin-table-fixed td.fixed-dept, .admin-table-fixed td.fixed-name { font-weight:850; color:#0f172a; }
+.admin-table-fixed td.fixed-score { text-align:center; font-weight:950; color:#0f172a; }
+.admin-table-fixed td.fixed-pass { text-align:center; }
+.admin-result-table td, .admin-result-table th { font-size:13px; font-weight:800; vertical-align:middle; }
+.admin-result-table th { font-weight:950; color:#334155; }
+.admin-result-table td.fixed-dept, .admin-result-table td.fixed-name { font-weight:850; color:#0f172a; }
+.admin-result-table td.fixed-score, .admin-result-table td.fixed-pass { text-align:center; }
+@media (max-width: 720px) { .admin-recent-row { grid-template-columns:1fr 80px; } .admin-recent-row .recent-pass { text-align:left; } }
+
+@media (max-width: 720px) { .result-profile-chips { justify-content:center; } }
 </style>
 </head>
 <body>
@@ -2842,6 +2901,33 @@ function updateLoginDepartments(type) {
     list.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join("");
 }
 
+function resetDemoModeState() {
+  state.lastResult = null;
+  state.currentExam = null;
+  state.currentQuestionIndex = 0;
+  state.remainingSeconds = 0;
+  state.isSubmitting = false;
+  state.examIntroReady = false;
+  state.examGuardActive = false;
+  state.isTestMode = true;
+  hideSubmitBuffer();
+  clearTimer();
+  clearIntroCountdown();
+  removeExamGuards();
+  removePreExamGuards();
+  try {
+    Object.keys(localStorage || {}).forEach((key) => {
+      if (/TEST-0001|test|demo|currentExam|activeExam/i.test(key)) localStorage.removeItem(key);
+    });
+    Object.keys(sessionStorage || {}).forEach((key) => {
+      if (/TEST-0001|test|demo|currentExam|activeExam/i.test(key)) sessionStorage.removeItem(key);
+    });
+  } catch (e) {}
+  activeExams = activeExams.filter((item) => !String(item.key || "").includes("TEST-0001") && item.employeeId !== "TEST-0001");
+  examResults = examResults.filter((item) => item.employeeId !== "TEST-0001");
+  activityLogs = activityLogs.filter((item) => item.employeeId !== "TEST-0001");
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   const form       = new FormData(event.currentTarget);
@@ -2851,11 +2937,10 @@ async function handleLogin(event) {
 
   // 테스트 모드: 운영 DB 저장 없이 화면/출제 흐름 점검용
   if (name.toLowerCase() === "test") {
+    resetDemoModeState();
     state.currentUser = { employeeId: "TEST-0001", department: department || "테스트", name: "테스트", role: "candidate" };
     state.loginError  = "";
     state.isTestMode  = true;
-    state.lastResult  = null;
-    state.currentExam = null;
     state.view        = "candidate";
     render();
     return;
@@ -3655,6 +3740,50 @@ function buildAnswerReview(exam) {
   });
 }
 
+function ensureSubmitBufferRoot() {
+  let root = document.getElementById("submitBufferRoot");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "submitBufferRoot";
+    document.body.appendChild(root);
+  }
+  return root;
+}
+
+function showSubmitBuffer(statusText = "서버로 답안을 전송하고 있습니다.", errorMessage = "") {
+  const root = ensureSubmitBufferRoot();
+  root.innerHTML = `
+    <div class="submit-buffer-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="submitBufferTitle">
+      <section class="submit-buffer-card">
+        ${errorMessage ? "" : `<div class="submit-buffer-spinner" aria-hidden="true"></div>`}
+        <h2 id="submitBufferTitle" class="submit-buffer-title">${errorMessage ? "제출 실패" : "제출중입니다"}</h2>
+        <p class="submit-buffer-sub">${errorMessage ? "전송이 완료되지 않았습니다." : "잠시만 기다려 주세요"}</p>
+        <div class="submit-buffer-status">${escapeHtml(statusText)}</div>
+        ${errorMessage ? `<div class="submit-buffer-error">${escapeHtml(errorMessage)}</div>
+          <div class="submit-buffer-actions">
+            <button class="btn primary" type="button" onclick="retrySubmitExamFromBuffer()">다시 제출</button>
+            <button class="btn" type="button" onclick="hideSubmitBuffer(); state.isSubmitting=false; addExamGuards(); startTimer(); renderExamScreen();">시험 화면으로 돌아가기</button>
+          </div>` : `<div class="submit-buffer-progress" aria-hidden="true"><span></span></div>`}
+      </section>
+    </div>`;
+}
+
+function updateSubmitBuffer(statusText) {
+  const el = document.querySelector(".submit-buffer-status");
+  if (el) el.textContent = statusText;
+}
+
+function hideSubmitBuffer() {
+  const root = document.getElementById("submitBufferRoot");
+  if (root) root.innerHTML = "";
+}
+
+function retrySubmitExamFromBuffer() {
+  hideSubmitBuffer();
+  state.isSubmitting = false;
+  submitExam(false, false, "시험 제출 완료");
+}
+
 async function submitExam(isAutoSubmit = false, forceDisqualified = false, submitMessage = "시험 제출 완료") {
   // §7: 프론트 중복 제출 방지
   if (!state.currentExam || state.isSubmitting) return;
@@ -3664,15 +3793,17 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
   if (_submitBtn) { _submitBtn.disabled = true; _submitBtn.textContent = "제출 중..."; }
 
   closeModal();
+  showSubmitBuffer("제출 준비 중입니다. 브라우저를 닫지 마세요.");
   clearTimer();
   removeExamGuards();
 
-  if (hasAttemptedThisQuarter(state.currentUser.employeeId, state.currentExam.quarter)) {
-    alert("이미 제출된 응시 기록이 있습니다.");
+  if (hasAttemptedThisQuarter(state.currentUser.employeeId, state.currentExam.quarter) && !state.isTestMode) {
+    updateSubmitBuffer("이미 제출된 기록을 확인했습니다. 결과 화면으로 이동합니다.");
     clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
     state.currentExam  = null;
     state.view         = "candidate";
     state.isSubmitting = false;
+    hideSubmitBuffer();
     renderCandidateDashboard();
     return;
   }
@@ -3730,33 +3861,42 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
     answerReview: buildAnswerReview(state.currentExam)
   };
 
-  if (!state.isTestMode) {
-    const saveResult = await appendResultToSheet(result, submitLog);
-    if (!saveResult?.ok) {
-      alert(saveResult?.message || "서버 저장에 실패했습니다. 다시 제출해 주세요.");
-      state.isSubmitting = false;
-      addExamGuards();
-      startTimer();
-      renderExamScreen();
-      return;
+  try {
+    if (!state.isTestMode) {
+      updateSubmitBuffer("서버에 답안과 결과를 저장하고 있습니다.");
+      const saveResult = await appendResultToSheet(result, submitLog);
+      if (!saveResult?.ok) throw new Error(saveResult?.message || "서버 저장에 실패했습니다. 다시 제출해 주세요.");
+      updateSubmitBuffer("전송 완료를 확인했습니다. 결과 화면을 준비합니다.");
+      examResults.push(result);
+      activityLogs.push(submitLog);
+      clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
+    } else {
+      updateSubmitBuffer("데모 모드 결과를 생성하고 있습니다.");
     }
-    examResults.push(result);
-    activityLogs.push(submitLog);
-    clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
-  }
 
-  state.lastResult   = result;
-  state.currentExam  = null;
-  state.view         = "result";
-  state.isSubmitting = false;
-  renderResultScreen();
+    state.lastResult   = result;
+    state.currentExam  = null;
+    state.view         = "result";
+    state.isSubmitting = false;
+    setTimeout(() => {
+      hideSubmitBuffer();
+      renderResultScreen();
+    }, 250);
+  } catch (error) {
+    console.error(error);
+    showSubmitBuffer("전송 실패: 네트워크 또는 서버 상태를 확인한 뒤 다시 시도해 주세요.", error.message || String(error));
+    state.isSubmitting = false;
+    if (_submitBtn) { _submitBtn.disabled = false; _submitBtn.textContent = "최종 제출"; }
+  }
 }
+
 
 /* ─── 결과 화면 ───────────────────────────────── */
 function renderResultScreen() {
   clearTimer();
   removeExamGuards();
   clearIntroCountdown();
+  hideSubmitBuffer();
   const serverResult = state.currentUser
     ? examResults
         .filter((r) => r.employeeId === state.currentUser.employeeId && r.quarter === getCurrentQuarter())
@@ -3775,53 +3915,48 @@ function renderResultScreen() {
   const cls      = passed ? "success" : "danger";
   const emoji    = passed ? "🎉" : (result.disqualified ? "🚫" : "😔");
   const scoreBar = Math.min(100, result.percentageScore);
-  const wrong    = result.totalCount - result.correctCount;
+  const wrong    = Math.max(0, result.totalCount - result.correctCount);
+  const resultDept = result.department || state.currentUser?.department || "-";
+  const resultName = result.name || state.currentUser?.name || "-";
+  const resultQuarter = result.quarter || getCurrentQuarter();
 
   app.innerHTML = `
     ${buildHeader()}
     <main class="container v2-container">
-      <section class="v2-result-card ${cls}" aria-labelledby="resultTitle">
+      <div class="v2-profile-chips result-profile-chips" aria-label="응시자 결과 요약">
+        <span class="v2-chip"><span class="v2-chip-label">분기</span>${escapeHtml(resultQuarter)}</span>
+        <span class="v2-chip"><span class="v2-chip-label">소속</span>${escapeHtml(resultDept)}</span>
+        <span class="v2-chip"><span class="v2-chip-label">성명</span>${escapeHtml(resultName)}</span>
+      </div>
 
+      <section class="v2-result-card ${cls} result-compact-only" aria-labelledby="resultTitle">
         <div class="v2-result-top">
           <div class="v2-result-emoji" aria-hidden="true">${emoji}</div>
           <h2 id="resultTitle" class="v2-result-label ${cls}">${label}</h2>
-          <p class="v2-result-sub">응시하느라 고생하셨습니다. 감사합니다.</p>
+          <p class="v2-result-sub">응시하느라 고생하셨습니다. 아래 결과를 확인해 주세요.</p>
           ${result.disqualified ? `<p class="v2-result-disq">실격 사유: ${escapeHtml(result.disqualificationReason)}</p>` : ""}
         </div>
 
-        <!-- 점수 게이지 -->
         <div class="v2-score-gauge-wrap" aria-label="점수 ${result.percentageScore}점">
           <div class="v2-score-num ${cls}">${result.percentageScore}<span class="v2-score-unit">점</span></div>
           <div class="v2-score-gauge-outer">
             <div class="v2-score-gauge-track">
               <div class="v2-score-gauge-fill ${cls}" style="width:${scoreBar}%"></div>
             </div>
-
           </div>
         </div>
 
-        <!-- 상세 스탯: 총문항(좌) / 정답(중) / 오답(우) -->
-        <div class="v2-result-stats">
-          <div class="v2-result-stat">
-            <span class="v2-result-stat-key">총 문항</span>
-            <span class="v2-result-stat-val neutral">${result.totalCount}</span>
-          </div>
-          <div class="v2-result-stat-div"></div>
-          <div class="v2-result-stat">
-            <span class="v2-result-stat-key">정답</span>
-            <span class="v2-result-stat-val correct">${result.correctCount}</span>
-          </div>
-          <div class="v2-result-stat-div"></div>
-          <div class="v2-result-stat">
-            <span class="v2-result-stat-key">오답</span>
-            <span class="v2-result-stat-val wrong">${wrong}</span>
-          </div>
+        <div class="v2-result-stats" aria-label="채점 요약">
+          <div class="v2-result-stat"><span class="v2-result-stat-val neutral">${result.totalCount}</span><span class="v2-result-stat-key">문항</span></div>
+          <div class="v2-result-stat"><span class="v2-result-stat-val correct">${result.correctCount}</span><span class="v2-result-stat-key">정답</span></div>
+          <div class="v2-result-stat"><span class="v2-result-stat-val wrong">${wrong}</span><span class="v2-result-stat-key">오답</span></div>
         </div>
 
       </section>
     </main>
   `;
 }
+
 
 function launchConfetti() {
   // 기존 캔버스 제거
@@ -4094,13 +4229,13 @@ function renderAdminHome() {
     <div class="grid two" style="margin-top:16px">
       <section class="card">
         <div class="section-head"><h3>최근 응시 기록</h3></div>
-        <div class="recent-list">
+        <div class="admin-recent-list">
           ${recent.map(r => `
-            <div class="recent-item" style="padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:12px">
-              <span class="muted">${escapeHtml(r.department)}</span>
-              <strong style="font-weight:800">${escapeHtml(r.name)}</strong>
-              <span>${r.percentageScore}점</span>
-              <span>${r.disqualified ? "실격" : (r.passed ? "합격" : "불합격")}</span>
+            <div class="admin-recent-row">
+              <span class="recent-dept" title="${escapeHtml(r.department)}">${escapeHtml(r.department)}</span>
+              <span class="recent-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+              <span class="recent-score">${r.percentageScore}점</span>
+              <span class="recent-pass">${renderResultBadge(r)}</span>
             </div>
           `).join("") || `<div class="empty">최근 응시 기록이 없습니다.</div>`}
         </div>
@@ -4217,8 +4352,8 @@ function renderBarChart(items) {
 }
 
 function renderResultBadge(result) {
-  if (result.disqualified) return `<span class="badge danger">실격</span>`;
-  return `<span class="badge ${result.passed ? "success" : "danger"}">${result.passed ? "합격" : "불합격"}</span>`;
+  if (result.disqualified) return `<span class="pass-circle disq">실격</span>`;
+  return `<span class="pass-circle ${result.passed ? "pass" : "fail"}">${result.passed ? "합격" : "불합격"}</span>`;
 }
 
 function adminRefreshData() {
@@ -4402,10 +4537,9 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
   const wrongCount = answerReview.filter(item => !item.correct && !item.unanswered).length;
   const unansweredCount = answerReview.filter(item => item.unanswered).length;
   const totalCount = answerReview.length;
-  const categories = Array.from(new Set(answerReview.map(item => item.category).filter(Boolean)));
-  const summary = log?.questionSetSummary || {};
   const passText = latest.disqualified ? "실격" : (latest.passed ? "합격" : "불합격");
-  const passClass = latest.disqualified || !latest.passed ? "danger" : "success";
+  const viewer = [personDept, personName].filter(Boolean).join(" · ") || "-";
+
   const optionList = (item) => (item.options || []).map((opt, idx) => {
     const isSelected = idx === item.selectedDisplayIndex;
     const isCorrect = idx === item.correctDisplayIndex;
@@ -4427,12 +4561,9 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
         ? `<span class="badge success">정답</span>`
         : `<span class="badge danger">오답</span>`;
     return `
-      <article class="ar-card">
+      <article class="ar-card ${item.unanswered ? "ar-card-unanswered" : (item.correct ? "ar-card-correct" : "ar-card-wrong")}">
         <div class="ar-card-head">
-          <div>
-            <span class="ar-no">${item.no}번</span>
-            <span class="ar-cat">${escapeHtml(item.category || "미분류")}</span>
-          </div>
+          <div class="ar-card-title"><span class="ar-no">${item.no}번</span></div>
           ${status}
         </div>
         <div class="ar-question">${escapeHtml(item.text || "")}</div>
@@ -4443,81 +4574,62 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
 
   modalRoot.innerHTML = `
     <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="answerReviewTitle">
-      <section class="modal ar-modal" style="max-width:min(1160px,96vw);width:96vw;max-height:92vh;overflow:auto">
+      <section class="modal ar-modal" style="max-width:min(1120px,96vw);width:96vw;max-height:92vh;overflow:auto">
         <style>
-          .ar-modal { padding: 0; overflow: hidden; }
-          .ar-header { position: sticky; top: 0; z-index: 3; background: var(--card); border-bottom: 1px solid var(--border); padding: 22px 24px 16px; }
-          .ar-title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
-          .ar-title { margin:0 0 6px; font-size:22px; }
-          .ar-subtitle { margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
-          .ar-body { padding: 18px 24px 24px; background: #f8fafc; }
-          .ar-summary-grid { display:grid; grid-template-columns: 1.1fr .9fr; gap:12px; margin-bottom:14px; }
-          .ar-panel { background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow: 0 10px 24px rgba(15,23,42,.04); }
-          .ar-panel h3 { margin:0 0 10px; font-size:14px; color:#334155; }
-          .ar-info-table { width:100%; border-collapse:collapse; font-size:13px; }
-          .ar-info-table th, .ar-info-table td { border:1px solid #e5e7eb; padding:8px 10px; vertical-align:top; }
-          .ar-info-table th { width:96px; background:#f8fafc; color:#475569; font-weight:700; }
-          .ar-score-box { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-          .ar-score { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#f8fafc; }
-          .ar-score .label { font-size:12px; color:#64748b; margin-bottom:4px; }
-          .ar-score .value { font-size:20px; font-weight:800; color:#0f172a; }
-          .ar-score .value.good { color:#166534; }
-          .ar-score .value.bad { color:#b91c1c; }
-          .ar-list { display:grid; gap:12px; }
-          .ar-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow: 0 10px 24px rgba(15,23,42,.04); }
-          .ar-card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
-          .ar-no { display:inline-flex; align-items:center; justify-content:center; min-width:44px; height:28px; border-radius:999px; background:#eff6ff; color:#1d4ed8; font-weight:800; font-size:13px; margin-right:6px; }
-          .ar-cat { display:inline-flex; align-items:center; height:28px; border-radius:999px; background:#f1f5f9; color:#334155; padding:0 10px; font-size:12px; font-weight:700; }
-          .ar-question { font-size:15px; font-weight:800; line-height:1.55; color:#0f172a; margin-bottom:12px; }
-          .ar-options { list-style:none; padding:0; margin:12px 0 0; display:grid; gap:7px; }
-          .ar-option { display:flex; align-items:flex-start; gap:8px; border:1px solid #e5e7eb; border-radius:12px; padding:9px 10px; background:#fff; }
-          .ar-option-no { flex:0 0 auto; width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; color:#334155; font-weight:800; font-size:12px; }
-          .ar-option-text { flex:1; line-height:1.45; }
-          .ar-option-badge { flex:0 0 auto; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#e2e8f0; color:#334155; }
+          .ar-modal { padding: 0; overflow: hidden; background:#f8fafc; }
+          .ar-sticky { position: sticky; top: 0; z-index: 4; background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border-bottom: 1px solid #e2e8f0; padding: 14px 18px 12px; }
+          .ar-title-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
+          .ar-title { margin:0; font-size:20px; font-weight:950; letter-spacing:-.03em; color:#0f172a; }
+          .ar-subtitle { margin:3px 0 0; color:#64748b; font-size:12px; font-weight:700; }
+          .ar-summary-strip { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px; }
+          .ar-summary-chip { border:1px solid #e2e8f0; background:#f8fafc; border-radius:12px; padding:9px 10px; min-width:0; }
+          .ar-summary-chip .key { display:block; font-size:11px; color:#64748b; font-weight:800; margin-bottom:3px; }
+          .ar-summary-chip .val { display:block; font-size:13px; color:#0f172a; font-weight:950; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+          .ar-body { padding: 16px 18px 22px; }
+          .ar-list { display:grid; gap:10px; max-width:720px; margin:0 auto; }
+          .ar-card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:0; box-shadow:none; transition:border-color .2s, background .2s; }
+          .ar-card-correct { border-color:#bbf7d0; background:#f8fff9; }
+          .ar-card-wrong { border-color:#fecaca; background:#fffafa; }
+          .ar-card-unanswered { border-color:#fde68a; background:#fffbeb; }
+          .ar-card-head { display:flex; align-items:baseline; gap:6px; margin-bottom:8px; }
+          .ar-card-title { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+          .ar-no { font-size:14px; font-weight:800; color:var(--primary); background:transparent; min-width:auto; height:auto; border-radius:0; }
+          .ar-viewer { display:inline-flex; align-items:center; min-height:22px; border-radius:999px; background:#f1f5f9; color:#334155; padding:0 8px; font-size:11px; font-weight:800; }
+          .ar-card-head .badge { margin-left:auto; }
+          .ar-question { font-size:14px; font-weight:600; line-height:1.5; color:var(--text); margin:0 0 10px; }
+          .ar-options { list-style:none; padding:0; margin:0; display:grid; gap:5px; }
+          .ar-option { display:flex; align-items:flex-start; gap:8px; border:1px solid var(--line); border-radius:8px; padding:6px 10px; background:var(--panel); }
+          .ar-option-no { flex:0 0 auto; width:20px; height:20px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#e2e8f0; color:#475569; font-weight:800; font-size:11px; }
+          .ar-option-text { flex:1; line-height:1.4; font-size:13px; color:var(--text); padding-top:1px; }
+          .ar-option-badge { flex:0 0 auto; border-radius:999px; padding:2px 7px; font-size:10px; font-weight:900; background:#e2e8f0; color:#334155; }
           .ar-option.pick { border-color:#93c5fd; background:#eff6ff; }
           .ar-option.answer { border-color:#86efac; background:#f0fdf4; }
           .ar-option.ok { border-color:#22c55e; background:#dcfce7; }
           .ar-option.pick .ar-option-badge { background:#dbeafe; color:#1d4ed8; }
           .ar-option.answer .ar-option-badge, .ar-option.ok .ar-option-badge { background:#bbf7d0; color:#166534; }
-          @media (max-width: 900px) { .ar-summary-grid { grid-template-columns:1fr; } .ar-title-row { flex-direction:column; } .ar-body { padding:14px; } .ar-header { padding:18px 16px 14px; } }
+          @media (max-width: 900px) { .ar-summary-strip { grid-template-columns: repeat(2,minmax(0,1fr)); } .ar-title-row { align-items:flex-start; } .ar-body { padding:14px; } .ar-sticky { padding:14px; } }
         </style>
-        <div class="ar-header">
+        <div class="ar-sticky">
           <div class="ar-title-row">
             <div>
               <h2 id="answerReviewTitle" class="ar-title">문제세트 및 답안 확인</h2>
-              <p class="ar-subtitle">제출 완료된 응시자의 출제 문항과 선택/정답 표시를 확인합니다.</p>
+              <p class="ar-subtitle">제출 완료된 응시자의 선택답안과 정답을 확인합니다.</p>
             </div>
             <button class="btn" type="button" onclick="closeModal()">닫기</button>
           </div>
+          <div class="ar-summary-strip">
+            <div class="ar-summary-chip"><span class="key">분기</span><span class="val">${escapeHtml(latest.quarter || "-")}</span></div>
+            <div class="ar-summary-chip"><span class="key">소속</span><span class="val">${escapeHtml(personDept || "-")}</span></div>
+            <div class="ar-summary-chip"><span class="key">성명</span><span class="val">${escapeHtml(personName || "-")}</span></div>
+            <div class="ar-summary-chip"><span class="key">점수</span><span class="val">${latest.percentageScore}점</span></div>
+          </div>
         </div>
         <div class="ar-body">
-          <div class="ar-summary-grid">
-            <section class="ar-panel">
-              <h3>응시자 정보</h3>
-              <table class="ar-info-table">
-                <tbody>
-                  <tr><th>소속</th><td>${escapeHtml(personDept || "-")}</td></tr>
-                  <tr><th>성명</th><td>${escapeHtml(personName || "-")}</td></tr>
-                  <tr><th>분기</th><td>${escapeHtml(latest.quarter || "-")}</td></tr>
-                  <tr><th>제출일시</th><td>${formatDateTime(latest.submittedAt)}</td></tr>
-                </tbody>
-              </table>
-            </section>
-            <section class="ar-panel">
-              <h3>채점 요약</h3>
-              <div class="ar-score-box">
-                <div class="ar-score"><div class="label">총 문항</div><div class="value">${totalCount}</div></div>
-                <div class="ar-score"><div class="label">점수</div><div class="value">${latest.percentageScore}점</div></div>
-                <div class="ar-score"><div class="label">결과</div><div class="value ${latest.passed && !latest.disqualified ? 'good' : 'bad'}">${escapeHtml(passText)}</div></div>
-                <div class="ar-score"><div class="label">정답</div><div class="value good">${correctCount}</div></div>
-                <div class="ar-score"><div class="label">오답/미응답</div><div class="value bad">${wrongCount}/${unansweredCount}</div></div>
-              </div>
-            </section>
-          </div>
           <div class="ar-list">${cards}</div>
         </div>
       </section>
     </div>`;
+
 }
 function _buildUserRowsHtml(rows) {
   // 중복 제거: employeeId 기준
@@ -4528,7 +4640,7 @@ function _buildUserRowsHtml(rows) {
   });
   // 정렬 적용
   const sorted = _sortUsers(unique);
-  if (!sorted.length) return `<tr><td colspan="13" class="empty">조건에 맞는 응시자가 없습니다.</td></tr>`;
+  if (!sorted.length) return `<tr><td colspan="12" class="empty">조건에 맞는 응시자가 없습니다.</td></tr>`;
 
   return sorted.map(user => {
     const attempted  = hasAttemptedThisQuarter(user.employeeId);
@@ -4548,10 +4660,8 @@ function _buildUserRowsHtml(rows) {
 
     // 합격 여부
     let passBadge = "-";
-    if (latest?.passed != null) {
-      passBadge = latest.passed
-        ? `<span class="badge success">합격</span>`
-        : `<span class="badge danger">불합격</span>`;
+    if (latest?.passed != null || latest?.disqualified) {
+      passBadge = renderResultBadge(latest);
     }
 
     // 이탈 표시
@@ -4580,18 +4690,17 @@ function _buildUserRowsHtml(rows) {
       : (activeRec?.updatedAt ? formatDateTime(activeRec.updatedAt) : "-");
     return `<tr style="${disq ? "background:rgba(194,65,12,.06)" : ""}">
       <td><span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;${typeColor}">${escapeHtml(userType)}</span></td>
-      <td>${escapeHtml(user.department) || "-"}</td>
-      <td>${latest
+      <td class="fixed-dept">${escapeHtml(user.department) || "-"}</td>
+      <td class="fixed-name">${latest
         ? `<button class="link-button" type="button" style="font-weight:800;text-decoration:underline;text-underline-offset:3px" title="제출 문제세트/선택 답안 보기" onclick="openSubmittedAnswerModal('${encodeURIComponent(user.employeeId)}')">${escapeHtml(user.name)}</button>`
         : `<strong>${escapeHtml(user.name)}</strong>`}</td>
       <td>${statusBadge}</td>
-      <td>${latest ? `<strong>${latest.percentageScore}점</strong>` : "-"}</td>
-      <td>${passBadge}</td>
+      <td class="fixed-score">${latest ? `<strong>${latest.percentageScore}점</strong>` : "-"}</td>
+      <td class="fixed-pass">${passBadge}</td>
       <td style="text-align:center" class="${tabCount >= examSettings.tabSwitchLimit ? 'leave-warning' : ''}">${tabBadge}</td>
       <td>${disqBadge}</td>
       <td style="font-size:12px">${startedAt}</td>
       <td style="font-size:12px">${submittedAt}</td>
-      <td style="font-size:12px">${updatedAt}</td>
       <td style="white-space:nowrap">
         <button class="btn small" type="button" onclick="resetCandidateRecords('${user.employeeId}')">초기화</button>
         <button class="btn small danger" type="button" onclick="deleteCandidate('${user.employeeId}')">삭제</button>
@@ -4699,13 +4808,19 @@ function renderUserManager() {
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table class="admin-table-fixed user-admin-table">
+          <colgroup>
+            <col style="width:82px"><col style="width:170px"><col style="width:118px">
+            <col style="width:116px"><col style="width:82px"><col style="width:86px">
+            <col style="width:112px"><col style="width:104px">
+            <col style="width:142px"><col style="width:142px"><col style="width:132px">
+          </colgroup>
           <thead>
             <tr>
               <th>구분</th><th>소속</th><th>성명</th>
               <th>응시상태</th><th>점수</th><th>합격여부</th>
               <th>화면이탈횟수</th><th>실격여부</th>
-              <th>시작일시</th><th>제출일시</th><th>최종수정일시</th><th>관리</th>
+              <th>시작일시</th><th>제출일시</th><th>관리</th>
             </tr>
           </thead>
           <tbody id="userTbody">
@@ -5411,9 +5526,14 @@ function renderResultsManager() {
             <span class="badge">${grouped[quarter].length}건</span>
           </div>
           <div class="table-wrap">
-            <table>
+            <table class="admin-result-table">
+              <colgroup>
+                <col style="width:140px"><col style="width:140px"><col style="width:86px">
+                <col style="width:170px"><col style="width:116px"><col style="width:78px">
+                <col style="width:82px"><col style="width:96px"><col style="width:214px"><col style="width:84px">
+              </colgroup>
               <thead>
-                <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>최종 상태</th><th>자격 유효기간</th><th>탭 전환</th></tr>
+                <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>합불여부</th><th>자격 유효기간</th><th>탭 전환</th></tr>
               </thead>
               <tbody>
                 ${grouped[quarter].map(r => `
@@ -5421,11 +5541,11 @@ function renderResultsManager() {
                     <td>${r.startedAt ? formatDateTime(r.startedAt) : "-"}</td>
                     <td>${formatDateTime(r.submittedAt)}</td>
                     <td>${(r.startedAt && r.submittedAt) ? (() => { const mins = Math.round((new Date(r.submittedAt) - new Date(r.startedAt)) / 60000); return mins + "분"; })() : "-"}</td>
-                    <td>${escapeHtml(r.department)}</td>
-                    <td>${escapeHtml(r.name)}</td>
+                    <td class="fixed-dept">${escapeHtml(r.department)}</td>
+                    <td class="fixed-name">${escapeHtml(r.name)}</td>
                     <td>${r.correctCount}/${r.totalCount}</td>
-                    <td>${r.percentageScore}점</td>
-                    <td>${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
+                    <td class="fixed-score"><strong>${r.percentageScore}점</strong></td>
+                    <td class="fixed-pass">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
                     <td>${getCertificationValidity(r) ? `${formatDateOnly(getCertificationValidity(r).validFrom)} ~ ${formatDateOnly(getCertificationValidity(r).validUntil)}` : "-"}</td>
                     <td>${r.tabSwitchCount ?? 0}회</td>
                   </tr>
