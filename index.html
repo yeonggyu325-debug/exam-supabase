@@ -1907,6 +1907,112 @@ function _fromExamResultRow(r) {
   };
 }
 
+function _mapUserRow(u) {
+  return {
+    employeeId: u.employee_id,
+    department: u.department || "",
+    name: u.name || "",
+    role: u.role || "candidate"
+  };
+}
+
+function _mapQuestionRow(q) {
+  return {
+    id: q.id,
+    category: q.category,
+    text: q.text,
+    options: [q.option_1, q.option_2, q.option_3, q.option_4, q.option_5].filter((v) => v !== null && v !== ""),
+    answerIndex: q.answer_index,
+    active: q.active
+  };
+}
+
+function _mapExamSettingsRow(s = {}) {
+  return {
+    totalQuestions: s.total_questions ?? examSettings.totalQuestions,
+    timeLimitMinutes: s.time_limit_minutes ?? examSettings.timeLimitMinutes,
+    passingScore: s.passing_score ?? examSettings.passingScore,
+    pointsPerQuestion: s.points_per_question ?? examSettings.pointsPerQuestion,
+    randomizeQuestions: s.randomize_questions ?? examSettings.randomizeQuestions,
+    randomizeOptions: s.randomize_options ?? examSettings.randomizeOptions,
+    tabSwitchLimit: s.tab_switch_limit ?? examSettings.tabSwitchLimit,
+    categoryQuota: s.category_quota || examSettings.categoryQuota || {}
+  };
+}
+
+function _mapActivityLogRow(l, userRows = []) {
+  let detail = {};
+  try {
+    detail = l.detail ? JSON.parse(l.detail) : {};
+  } catch (e) {
+    detail = {};
+  }
+
+  const user = (userRows || []).find((u) => u.employee_id === l.employee_id || u.employeeId === l.employee_id);
+
+  return {
+    logId: detail.logId || l.log_id,
+    employeeId: l.employee_id,
+    department: detail.department || user?.department || "",
+    name: detail.name || user?.name || "",
+    type: detail.type || detail.action || l.action || "",
+    message: detail.message || detail.detail || "",
+    tabSwitchCount: detail.tabSwitchCount || 0,
+    createdAt: detail.createdAt || l.created_at,
+    quarter: detail.quarter || "",
+    answerReview: Array.isArray(detail.answerReview) ? detail.answerReview : [],
+    questionSetSummary: detail.questionSetSummary || null,
+    rawDetail: detail
+  };
+}
+
+function _mapActiveExamRow(a, questionRows = []) {
+  const snap = a?.snapshot ? JSON.parse(JSON.stringify(a.snapshot)) : {};
+  if (!snap.exam && Array.isArray(snap.questionSet)) {
+    const questions = snap.questionSet.map((q) => {
+      const source = (questionRows || []).find((row) => String(row.id) === String(q.id || q.questionId));
+      const baseOptions = [source?.option_1, source?.option_2, source?.option_3, source?.option_4, source?.option_5]
+        .filter((v) => v !== null && v !== undefined && v !== "");
+      const order = Array.isArray(q.optionOrder) ? q.optionOrder : baseOptions.map((_, idx) => idx + 1);
+      const options = order.map((n) => baseOptions[Number(n) - 1] || "").filter((v) => v !== "");
+      const correctOriginal = Number(source?.answer_index ?? q.answerIndex ?? 0);
+      const correctDisplayIndex = Math.max(0, order.findIndex((n) => Number(n) === correctOriginal));
+      return {
+        questionId: q.id || q.questionId,
+        category: q.category || source?.category || "",
+        text: q.text || source?.text || "",
+        options,
+        correctDisplayIndex
+      };
+    });
+    const answers = Array(questions.length).fill(null);
+    const answerMap = snap.answers || {};
+    questions.forEach((q, idx) => {
+      const saved = answerMap[String(q.questionId)];
+      if (!saved) return;
+      if (typeof saved.selectedDisplayIndex === "number") answers[idx] = saved.selectedDisplayIndex;
+      else if (saved.selectedOriginalOption != null && Array.isArray(snap.questionSet?.[idx]?.optionOrder)) {
+        const displayIdx = snap.questionSet[idx].optionOrder.findIndex((n) => Number(n) === Number(saved.selectedOriginalOption));
+        if (displayIdx >= 0) answers[idx] = displayIdx;
+      }
+    });
+    snap.exam = {
+      employeeId: snap.employeeId || a.employee_id,
+      quarter: snap.quarter || a.quarter || getCurrentQuarter(),
+      startedAt: snap.examStartedAt || snap.startedAt || a.updated_at,
+      questions,
+      answers,
+      currentQuestionIndex: Number(snap.currentQuestionIndex || 0),
+      tabSwitchCount: Number(snap.tabSwitchCount || 0),
+      warningLogs: snap.warningLogs || [],
+      disqualified: Boolean(snap.disqualified),
+      disqualificationReason: snap.disqualificationReason || "",
+      lastViolationAt: 0
+    };
+  }
+  return { key: a.key, ...(snap || {}) };
+}
+
 async function _sbGetAppData() {
   if (!_sb) throw new Error("Supabase 클라이언트를 불러오지 못했습니다. CDN 또는 네트워크 연결을 확인하세요.");
 
@@ -1934,106 +2040,81 @@ async function _sbGetAppData() {
     throw new Error("Supabase 데이터 조회 실패: " + errors.map(([table, error]) => table + " - " + (error.message || error.code || error)).join(" / "));
   }
 
-  const s = settingsRes.data || {};
+  return {
+    users: (usersRes.data || []).map(_mapUserRow),
+    questionBank: (qbRes.data || []).map(_mapQuestionRow),
+    examSettings: _mapExamSettingsRow(settingsRes.data || {}),
+    examResults: (resultsRes.data || []).map(_fromExamResultRow),
+    activityLogs: (logsRes.data || []).map((l) => _mapActivityLogRow(l, usersRes.data || [])),
+    activeExams: (activeRes.data || []).map((a) => _mapActiveExamRow(a, qbRes.data || [])),
+    managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" }))
+  };
+}
+
+async function _sbGetLoginData() {
+  if (!_sb) throw new Error("Supabase 클라이언트를 불러오지 못했습니다. CDN 또는 네트워크 연결을 확인하세요.");
+
+  const [settingsRes, affRes] = await Promise.all([
+    _sb.from("exam_settings").select("*").eq("id", 1).maybeSingle(),
+    _sb.from("affiliations").select("name,type").order("type", { ascending: true }).order("name", { ascending: true })
+  ]);
+
+  const errors = [
+    ["exam_settings", settingsRes.error],
+    ["affiliations", affRes.error]
+  ].filter(([, error]) => error);
+
+  if (errors.length) {
+    throw new Error("로그인 초기 데이터 조회 실패: " + errors.map(([table, error]) => table + " - " + (error.message || error.code || error)).join(" / "));
+  }
 
   return {
-    users: (usersRes.data || []).map((u) => ({
-      employeeId: u.employee_id,
-      department: u.department || "",
-      name: u.name || "",
-      role: u.role || "candidate"
-    })),
-    questionBank: (qbRes.data || []).map((q) => ({
-      id: q.id,
-      category: q.category,
-      text: q.text,
-      options: [q.option_1, q.option_2, q.option_3, q.option_4, q.option_5].filter((v) => v !== null && v !== ""),
-      answerIndex: q.answer_index,
-      active: q.active
-    })),
-    examSettings: {
-      totalQuestions: s.total_questions,
-      timeLimitMinutes: s.time_limit_minutes,
-      passingScore: s.passing_score,
-      pointsPerQuestion: s.points_per_question,
-      randomizeQuestions: s.randomize_questions,
-      randomizeOptions: s.randomize_options,
-      tabSwitchLimit: s.tab_switch_limit,
-      categoryQuota: s.category_quota || {}
-    },
-    examResults: (resultsRes.data || []).map(_fromExamResultRow),
-    activityLogs: (logsRes.data || []).map((l) => {
-      let detail = {};
-      try {
-        detail = l.detail ? JSON.parse(l.detail) : {};
-      } catch (e) {
-        detail = {};
-      }
-
-      const user = (usersRes.data || []).find((u) => u.employee_id === l.employee_id);
-
-      return {
-        logId: detail.logId || l.log_id,
-        employeeId: l.employee_id,
-        department: detail.department || user?.department || "",
-        name: detail.name || user?.name || "",
-        type: detail.type || detail.action || l.action || "",
-        message: detail.message || detail.detail || "",
-        tabSwitchCount: detail.tabSwitchCount || 0,
-        createdAt: detail.createdAt || l.created_at,
-        quarter: detail.quarter || "",
-        answerReview: Array.isArray(detail.answerReview) ? detail.answerReview : [],
-        questionSetSummary: detail.questionSetSummary || null,
-        rawDetail: detail
-      };
-    }),
-    activeExams: (activeRes.data || []).map((a) => {
-      const snap = a.snapshot || {};
-      if (!snap.exam && Array.isArray(snap.questionSet)) {
-        const questions = snap.questionSet.map((q) => {
-          const source = (qbRes.data || []).find((row) => String(row.id) === String(q.id || q.questionId));
-          const baseOptions = [source?.option_1, source?.option_2, source?.option_3, source?.option_4, source?.option_5]
-            .filter((v) => v !== null && v !== undefined && v !== "");
-          const order = Array.isArray(q.optionOrder) ? q.optionOrder : baseOptions.map((_, idx) => idx + 1);
-          const options = order.map((n) => baseOptions[Number(n) - 1] || "").filter((v) => v !== "");
-          const correctOriginal = Number(source?.answer_index ?? q.answerIndex ?? 0);
-          const correctDisplayIndex = Math.max(0, order.findIndex((n) => Number(n) === correctOriginal));
-          return {
-            questionId: q.id || q.questionId,
-            category: q.category || source?.category || "",
-            text: q.text || source?.text || "",
-            options,
-            correctDisplayIndex
-          };
-        });
-        const answers = Array(questions.length).fill(null);
-        const answerMap = snap.answers || {};
-        questions.forEach((q, idx) => {
-          const saved = answerMap[String(q.questionId)];
-          if (!saved) return;
-          if (typeof saved.selectedDisplayIndex === "number") answers[idx] = saved.selectedDisplayIndex;
-          else if (saved.selectedOriginalOption != null && Array.isArray(snap.questionSet?.[idx]?.optionOrder)) {
-            const displayIdx = snap.questionSet[idx].optionOrder.findIndex((n) => Number(n) === Number(saved.selectedOriginalOption));
-            if (displayIdx >= 0) answers[idx] = displayIdx;
-          }
-        });
-        snap.exam = {
-          employeeId: snap.employeeId || a.employee_id,
-          quarter: snap.quarter || a.quarter || getCurrentQuarter(),
-          startedAt: snap.examStartedAt || snap.startedAt || a.updated_at,
-          questions,
-          answers,
-          currentQuestionIndex: Number(snap.currentQuestionIndex || 0),
-          tabSwitchCount: Number(snap.tabSwitchCount || 0),
-          warningLogs: snap.warningLogs || [],
-          disqualified: Boolean(snap.disqualified),
-          disqualificationReason: snap.disqualificationReason || "",
-          lastViolationAt: 0
-        };
-      }
-      return { key: a.key, ...(snap || {}) };
-    }),
+    examSettings: _mapExamSettingsRow(settingsRes.data || {}),
     managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" }))
+  };
+}
+
+async function _sbFindCandidateByProfile({ department, name }) {
+  if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
+  const { data, error } = await _sb
+    .from("users")
+    .select("employee_id,department,name,role")
+    .eq("role", "candidate")
+    .eq("department", department)
+    .eq("name", name)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? _mapUserRow(data) : null;
+}
+
+async function _sbGetCandidateRuntimeData(employeeId, quarter = getCurrentQuarter()) {
+  if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
+  if (!employeeId) throw new Error("응시자 ID가 없습니다.");
+
+  const activeKey = getActiveExamKey(employeeId, quarter);
+  const [settingsRes, qbRes, resultRes, activeRes] = await Promise.all([
+    _sb.from("exam_settings").select("*").eq("id", 1).maybeSingle(),
+    _sb.from("question_bank").select("*"),
+    _sb.from("exam_results").select("*").eq("employee_id", employeeId).eq("quarter", quarter).order("submitted_at", { ascending: false }).limit(1),
+    _sb.from("active_exams").select("*").eq("key", activeKey).maybeSingle()
+  ]);
+
+  const errors = [
+    ["exam_settings", settingsRes.error],
+    ["question_bank", qbRes.error],
+    ["exam_results", resultRes.error],
+    ["active_exams", activeRes.error]
+  ].filter(([, error]) => error);
+
+  if (errors.length) {
+    throw new Error("응시자 데이터 조회 실패: " + errors.map(([table, error]) => table + " - " + (error.message || error.code || error)).join(" / "));
+  }
+
+  return {
+    examSettings: _mapExamSettingsRow(settingsRes.data || {}),
+    questionBank: (qbRes.data || []).map(_mapQuestionRow),
+    examResults: (resultRes.data || []).map(_fromExamResultRow),
+    activeExams: activeRes.data ? [_mapActiveExamRow(activeRes.data, qbRes.data || [])] : []
   };
 }
 
@@ -2160,28 +2241,78 @@ async function _sbInsertActivityLogData(log) {
 
 async function _sbAppendExamSubmission(result, log) {
   try {
-    const { data, error } = await _sb.rpc("submit_exam_once", {
-      p_result_id: result.resultId,
-      p_employee_id: result.employeeId,
-      p_department: result.department || "",
-      p_name: result.name || "",
-      p_quarter: result.quarter || "",
-      p_percentage_score: result.percentageScore ?? 0,
-      p_correct_count: result.correctCount ?? 0,
-      p_total_count: result.totalCount ?? 0,
-      p_passed: !!result.passed,
-      p_disqualified: !!result.disqualified,
-      p_disqualification_reason: result.disqualificationReason || "",
-      p_tab_switch_count: result.tabSwitchCount ?? 0,
-      p_started_at: result.startedAt || null,
-      p_submitted_at: result.submittedAt || null,
-      p_log_id: String(log?.logId || makeLogId()),
-      p_log_action: log?.type || log?.action || "exam_submit",
-      p_log_detail: log || {}
-    });
+    const { data: existing, error: existingError } = await _sb
+      .from("exam_results")
+      .select("result_id")
+      .eq("employee_id", result.employeeId)
+      .eq("quarter", result.quarter)
+      .maybeSingle();
 
-    if (error) throw error;
-    return data || { ok: true };
+    if (existingError) throw existingError;
+
+    if (existing) {
+      const now = new Date().toISOString();
+      const logId = makeLogId();
+      const duplicateLog = {
+        log_id: logId,
+        employee_id: result.employeeId,
+        action: "SUBMIT_SKIPPED_DUPLICATE",
+        detail: JSON.stringify({
+          logId,
+          employeeId: result.employeeId,
+          department: result.department || "",
+          name: result.name || "",
+          type: "SUBMIT_SKIPPED_DUPLICATE",
+          message: "이미 같은 분기에 제출한 결과가 있어 중복 제출을 저장하지 않았습니다.",
+          createdAt: now
+        })
+      };
+
+      const { error: dupLogError } = await _sb.from("activity_logs").insert(duplicateLog);
+      if (dupLogError) console.warn("중복 제출 로그 저장 실패", dupLogError);
+
+      return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
+    }
+
+    const { error: insertError } = await _sb.from("exam_results").insert({
+      result_id: result.resultId,
+      employee_id: result.employeeId,
+      department: result.department || "",
+      name: result.name || "",
+      quarter: result.quarter || "",
+      percentage_score: result.percentageScore ?? 0,
+      correct_count: result.correctCount ?? 0,
+      total_count: result.totalCount ?? 0,
+      passed: !!result.passed,
+      disqualified: !!result.disqualified,
+      disqualification_reason: result.disqualificationReason || "",
+      tab_switch_count: result.tabSwitchCount ?? 0,
+      started_at: result.startedAt || null,
+      submitted_at: result.submittedAt || null
+    });
+    if (insertError) {
+      const duplicate = insertError.code === "23505" || /duplicate key|unique/i.test(insertError.message || "");
+      if (duplicate) {
+        return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
+      }
+      throw insertError;
+    }
+
+    if (log) {
+      const { error: logError } = await _sb.from("activity_logs").insert({
+        log_id: String(log.logId || makeLogId()),
+        employee_id: result.employeeId,
+        action: log.type || log.action || "exam_submit",
+        detail: JSON.stringify(log)
+      });
+      if (logError) throw logError;
+    }
+
+    const key = result.employeeId + "__" + result.quarter;
+    const { error: activeDeleteError } = await _sb.from("active_exams").delete().eq("key", key);
+    if (activeDeleteError) throw activeDeleteError;
+
+    return { ok: true };
   } catch (err) {
     return { ok: false, message: err.message || String(err) };
   }
@@ -2266,6 +2397,15 @@ async function callExternalApi(action, payload = {}) {
     case "getAppData":
       result = { ok: true, data: await _sbGetAppData() };
       break;
+    case "getLoginData":
+      result = { ok: true, data: await _sbGetLoginData() };
+      break;
+    case "findCandidate":
+      result = { ok: true, data: await _sbFindCandidateByProfile(payload) };
+      break;
+    case "getCandidateRuntimeData":
+      result = { ok: true, data: await _sbGetCandidateRuntimeData(payload.employeeId, payload.quarter) };
+      break;
     case "saveAppData":
       result = { ok: true, data: await _sbSaveAppData(payload) };
       break;
@@ -2349,6 +2489,50 @@ function loadRemoteData(done) {
 
   state.loginError = "Supabase 클라이언트를 사용할 수 없습니다. 인터넷 연결 또는 CDN 로딩을 확인해 주세요.";
   done(false);
+}
+
+function loadInitialData(done) {
+  if (isAppsScriptRuntime()) {
+    // GAS 환경은 기존 getAppData 인터페이스만 있을 수 있어 기존 전체 로드를 유지합니다.
+    loadRemoteData(done);
+    return;
+  }
+
+  if (isExternalApiRuntime()) {
+    callExternalApi("getLoginData")
+      .then(data => { applyRemoteData(data); state._loginDataLoaded = true; done(true); })
+      .catch(error => {
+        console.error("로그인 초기 데이터 로드에 실패했습니다.", error);
+        state.loginError = "서버 연결에 실패했습니다. 네트워크 또는 Supabase 권한 설정을 확인해 주세요.";
+        done(false);
+      });
+    return;
+  }
+
+  state.loginError = "Supabase 클라이언트를 사용할 수 없습니다. 인터넷 연결 또는 CDN 로딩을 확인해 주세요.";
+  done(false);
+}
+
+async function loadCandidateRuntimeData(candidate, quarter = getCurrentQuarter()) {
+  if (!candidate?.employeeId) throw new Error("응시자 정보가 없습니다.");
+
+  if (isAppsScriptRuntime()) {
+    return await new Promise((resolve) => {
+      loadRemoteData((ok) => resolve(ok));
+    });
+  }
+
+  if (isExternalApiRuntime()) {
+    const data = await callExternalApi("getCandidateRuntimeData", { employeeId: candidate.employeeId, quarter });
+    applyRemoteData({
+      users: [candidate],
+      ...data
+    });
+    state._remoteLoaded = true;
+    return true;
+  }
+
+  throw new Error("서버 연결을 사용할 수 없습니다.");
 }
 
 let _remoteSaveTimer = null;
@@ -2936,14 +3120,35 @@ async function handleLogin(event) {
     return;
   }
 
-  const candidate = users.find(user => user.role === "candidate" && user.department === department && user.name === name);
+  state.view = "loading";
+  renderLoadingScreen("응시자 정보를 확인하는 중입니다", 20);
+
+  let candidate = null;
+  try {
+    if (isExternalApiRuntime()) {
+      candidate = await callExternalApi("findCandidate", { department, name });
+    } else {
+      candidate = users.find(user => user.role === "candidate" && user.department === department && user.name === name);
+    }
+  } catch (e) {
+    console.error("응시자 조회 실패", e);
+    state.loginError = "응시자 정보를 확인하지 못했습니다. 네트워크 또는 데이터베이스 상태를 확인해 주세요.";
+    state.view = "login";
+    renderLogin();
+    return;
+  }
+
   if (candidate) {
     state.currentUser = candidate;
     state.loginError  = "";
     state.lastResult  = null;
     state.isSubmitting = false;
 
-    const resolveAfterRemote = async () => {
+    try {
+      updateLoadingProgress(45, "시험 정보를 불러오는 중입니다");
+      await loadCandidateRuntimeData(candidate);
+      updateLoadingProgress(100, "완료!");
+
       const currentQuarterResult = examResults
         .filter(result => result.employeeId === candidate.employeeId && result.quarter === getCurrentQuarter())
         .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
@@ -2955,13 +3160,6 @@ async function handleLogin(event) {
       }
 
       let activeRecord = getActiveExamRecord(candidate.employeeId);
-      try {
-        const serverRecord = await fetchActiveExamRecordFromServer(candidate.employeeId);
-        if (serverRecord) activeRecord = serverRecord;
-      } catch (e) {
-        console.warn("진행 중 시험 직접 조회 실패", e);
-      }
-
       if (restoreActiveExamRecord(activeRecord)) {
         renderExamScreen();
         startTimer();
@@ -2970,20 +3168,16 @@ async function handleLogin(event) {
 
       state.view = "candidate";
       renderCandidateDashboard();
-    };
-
-    state.view = "loading";
-    renderLoadingScreen("응시 정보를 확인하는 중입니다", 30);
-    if (isAppsScriptRuntime() || isExternalApiRuntime()) {
-      loadRemoteData(() => {
-        updateLoadingProgress(100, "완료!");
-        setTimeout(() => { resolveAfterRemote(); }, 100);
-      });
-    } else {
-      resolveAfterRemote();
+      return;
+    } catch (e) {
+      console.error("응시 정보 로드 실패", e);
+      state.loginError = "응시 정보를 불러오지 못했습니다. 네트워크 또는 Supabase 권한 설정을 확인해 주세요.";
+      state.view = "login";
+      renderLogin();
+      return;
     }
-    return;
   }
+
 
   state.loginError = "등록된 응시자 정보와 일치하지 않습니다. 소속과 성명을 다시 확인하세요.";
   renderLogin();
@@ -5753,7 +5947,7 @@ function renderLogManager() {
       setTimeout(() => { window._appJustLoaded = false; }, 800);
 
       state.view = "loading";
-      renderLoadingScreen("서버 데이터를 불러오는 중입니다", 30);
+      renderLoadingScreen("로그인 정보를 불러오는 중입니다", 30);
 
       if (!(isAppsScriptRuntime() || isExternalApiRuntime())) {
         state.loginError = "서버 연결을 사용할 수 없습니다. Supabase 연결 상태를 확인해 주세요.";
@@ -5762,48 +5956,81 @@ function renderLogManager() {
         return;
       }
 
-      loadRemoteData((ok) => {
+      const finishLoginScreen = () => {
+        state.view = "login";
+        render();
+      };
+
+      loadInitialData(async (ok) => {
         if (!ok) {
-          state.view = "login";
-          render();
+          finishLoginScreen();
           return;
         }
 
-        let restored = false;
-        if (savedSession?.user && savedSession?.view) {
-          state.currentUser  = savedSession.user;
-          state.adminSection = savedSession.adminSection || "dashboard";
-          state.isTestMode   = false;
+        if (!savedSession?.user || !savedSession?.view) {
+          finishLoginScreen();
+          return;
+        }
+
+        state.currentUser  = savedSession.user;
+        state.adminSection = savedSession.adminSection || "dashboard";
+        state.isTestMode   = false;
+
+        // 관리자는 관리자 데이터가 필요하므로 이때만 전체 데이터를 로드합니다.
+        if (savedSession.user.role === "admin" || savedSession.view === "admin") {
+          renderLoadingScreen("관리자 데이터를 불러오는 중입니다", 60);
+          loadRemoteData((adminOk) => {
+            if (!adminOk) {
+              state.currentUser = null;
+              finishLoginScreen();
+              return;
+            }
+            state.view = "admin";
+            render();
+          });
+          return;
+        }
+
+        try {
+          renderLoadingScreen("응시 정보를 확인하는 중입니다", 60);
+          await loadCandidateRuntimeData(savedSession.user);
+
+          let restored = false;
           if (savedSession.view === "exam") {
             restored = restoreExamFromActiveRecord(savedSession.user);
             if (!restored) state.view = "candidate";
+          } else if (savedSession.view === "result") {
+            const empId = savedSession.user.employeeId;
+            const serverResult = examResults
+              .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
+              .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
+            if (serverResult) {
+              state.lastResult = serverResult;
+              state.view = "result";
+              restored = true;
+            } else {
+              state.lastResult = null;
+              state.view = "candidate";
+            }
           } else {
-            state.view = savedSession.view;
-            restored = true;
+            state.view = savedSession.view === "candidate" ? "candidate" : "login";
+            restored = state.view !== "login";
           }
-        }
 
-        if (!restored) state.view = "login";
-
-        if (state.view === "result" && state.currentUser) {
-          const empId = state.currentUser.employeeId;
-          const serverResult = examResults
-            .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
-            .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
-          if (!serverResult) {
-            state.lastResult = null;
-            state.view = "candidate";
-          } else {
-            state.lastResult = serverResult;
+          if (!restored && state.view !== "candidate") state.view = "login";
+          render();
+          if (state.view === "exam" && state.currentExam) {
+            setTimeout(() => { startTimer(); }, 100);
           }
-        }
-
-        render();
-        if (state.view === "exam" && state.currentExam) {
-          setTimeout(() => { startTimer(); }, 100);
+        } catch (e) {
+          console.error("세션 복원 실패", e);
+          state.currentUser = null;
+          state.loginError = "세션을 복원하지 못했습니다. 다시 로그인해 주세요.";
+          finishLoginScreen();
         }
       });
     }
+
     initApp();
   </script>
 </body>
