@@ -1494,7 +1494,1171 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 720px) { .admin-recent-row { grid-template-columns:1fr 80px; } .admin-recent-row .recent-pass { text-align:left; } }
 
 @media (max-width: 720px) { .result-profile-chips { justify-content:center; } }
-.v2-sync-status{align-items:center;min-height:24px;border-radius:999px;padding:0 9px;font-size:11px;font-weight:900;white-space:nowrap}.v2-sync-ok{background:#ecfdf5;color:#047857;border:1px solid #bbf7d0}.v2-sync-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+/* 저장 상태: 제출 버퍼와 톤을 맞춘 통신 상태 인디케이터 */
+.v2-sync-status{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:30px;min-width:34px;padding:4px 9px;border-radius:999px;
+  background:#fff;border:1px solid #dbeafe;box-shadow:0 8px 20px rgba(37,99,235,.10);
+  color:#334155;font-size:11px;font-weight:900;line-height:1;white-space:nowrap;
+}
+.v2-sync-status::before{
+  content:"";width:18px;height:18px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
+  box-sizing:border-box;flex:none;
+}
+.v2-sync-status.v2-sync-saving{border-color:#bfdbfe;background:#eff6ff;box-shadow:0 8px 22px rgba(37,99,235,.16)}
+.v2-sync-status.v2-sync-saving::before{border:3px solid #dbeafe;border-top-color:#2563eb;animation:syncSpin .75s linear infinite;background:#fff}
+.v2-sync-status.v2-sync-ok{border-color:#bbf7d0;background:#f0fdf4;box-shadow:0 8px 20px rgba(22,163,74,.12)}
+.v2-sync-status.v2-sync-ok::before{content:"✓";border:2px solid #22c55e;background:#fff;color:#16a34a;font-size:12px;font-weight:1000;line-height:1}
+.v2-sync-status.v2-sync-error{border-color:#fecaca;background:#fef2f2;color:#b91c1c;box-shadow:0 8px 20px rgba(220,38,38,.12)}
+.v2-sync-status.v2-sync-error::before{content:"!";border:2px solid #ef4444;background:#fff;color:#dc2626;font-size:12px;font-weight:1000;line-height:1}
+@keyframes syncSpin{to{transform:rotate(360deg)}}
+
+
+/* ════════════════════════════════════════
+   UI POLISH SYSTEM — 2026 business-grade design refresh
+   - 색상/카드/버튼/표/시험 화면/관리자 화면 통일
+   ════════════════════════════════════════ */
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-soft: #eff6ff;
+  --primary-line: #bfdbfe;
+  --success: #16a34a;
+  --success-dark: #15803d;
+  --success-soft: #f0fdf4;
+  --success-line: #bbf7d0;
+  --danger: #dc2626;
+  --danger-dark: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-line: #fecaca;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --warning-line: #fed7aa;
+  --bg: #f4f7fb;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --line: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --shadow-card: 0 8px 24px rgba(15, 23, 42, .055);
+  --shadow-emphasis: 0 18px 50px rgba(15, 23, 42, .10);
+  --shadow-overlay: 0 24px 80px rgba(15, 23, 42, .22);
+  --focus: 0 0 0 4px rgba(37, 99, 235, .16);
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, .08), transparent 34%),
+    var(--bg);
+  color: var(--text);
+}
+
+/* topbar / brand */
+.topbar {
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .035);
+}
+.brand h1 { color: var(--text); letter-spacing: -.025em; }
+.brand-logo { filter: saturate(1.02); }
+
+/* 카드 계층 통일 */
+.card,
+.metric,
+.ready-card,
+.v2-question-card,
+.table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.login-card.v2,
+.v2-result-card,
+.v2-ready-card,
+.exam-ready-card {
+  background: var(--panel);
+  border: 1px solid rgba(37, 99, 235, .12);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-emphasis);
+  overflow: hidden;
+}
+.modal,
+.submit-buffer-card {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-overlay);
+  border: 1px solid var(--line);
+}
+.card { padding: 20px; }
+.section-head h2,
+.section-head h3 { letter-spacing: -.03em; color: var(--text); }
+.section-head p { color: var(--muted); }
+
+/* 버튼 통일 */
+.btn {
+  border-radius: var(--radius-md);
+  min-height: 40px;
+  padding: 9px 14px;
+  font-weight: 850;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  box-shadow: none;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, background .14s ease;
+}
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary-line);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .07);
+}
+.btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, .18);
+}
+.btn.primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+.btn.danger {
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+  color: var(--danger);
+}
+.btn.success {
+  background: var(--success-soft);
+  border-color: var(--success-line);
+  color: var(--success);
+}
+.btn.small { min-height: 32px; border-radius: 10px; padding: 6px 10px; }
+
+/* 로그인 화면 브랜드감 */
+.login-wrap {
+  background:
+    radial-gradient(circle at 12% 5%, rgba(37, 99, 235, .16), transparent 32%),
+    radial-gradient(circle at 88% 18%, rgba(22, 163, 74, .08), transparent 26%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+}
+.login-card-banner {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid var(--line);
+}
+.login-title { color: var(--text); letter-spacing: -.03em; }
+.login-form input,
+.login-form select,
+input, select, textarea {
+  border-color: var(--line);
+  border-radius: var(--radius-md);
+}
+.login-form input:focus,
+.login-form select:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: var(--focus);
+  background: #fff;
+}
+
+/* 시험 상단바 컨트롤 센터 */
+.v2-exam-bar,
+.exam-sticky-bar {
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+}
+.v2-exam-bar-inner {
+  min-height: 54px;
+  gap: 14px;
+}
+.v2-exam-warn,
+.v2-exam-progress-text,
+.exam-stat {
+  color: var(--muted);
+  font-weight: 800;
+}
+.v2-exam-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 21px;
+  font-weight: 950;
+  color: var(--text);
+  letter-spacing: -.02em;
+}
+.v2-exam-progress-track { height: 3px; background: var(--line); }
+.v2-exam-progress-fill { background: var(--primary); }
+.v2-submit-btn,
+.v2-submit-final-btn { border-radius: 12px !important; }
+
+/* 저장 상태 pill — 제출 버퍼 스피너와 톤 통일 */
+.v2-sync-status {
+  min-height: 30px;
+  padding: 0 10px;
+  gap: 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+  box-shadow: none;
+  vertical-align: middle;
+}
+.v2-sync-status::before {
+  content: "";
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: none;
+}
+.v2-sync-status.v2-sync-saving {
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  color: var(--primary-dark);
+}
+.v2-sync-status.v2-sync-saving::before {
+  border: 3px solid #dbeafe;
+  border-top-color: var(--primary);
+  background: #fff;
+  animation: syncSpin .76s linear infinite;
+}
+.v2-sync-status.v2-sync-ok {
+  background: var(--success-soft);
+  border: 1px solid var(--success-line);
+  color: var(--success-dark);
+}
+.v2-sync-status.v2-sync-ok::before {
+  content: "✓";
+  border: 2px solid #22c55e;
+  background: #fff;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 1000;
+  line-height: 1;
+}
+.v2-sync-status.v2-sync-error {
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-dark);
+}
+.v2-sync-status.v2-sync-error::before {
+  content: "!";
+  border: 2px solid #ef4444;
+  background: #fff;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 1000;
+  line-height: 1;
+}
+
+/* 문제 카드 / 선택지 */
+.v2-exam-container { max-width: 760px; }
+.v2-question-card {
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.v2-question-card.v2-question-answered {
+  border-color: #dbeafe;
+  background: #fbfdff;
+}
+.v2-question-text {
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.6;
+  color: var(--text);
+}
+.v2-option {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 7px;
+  transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, transform .14s ease;
+}
+.v2-option:hover {
+  background: var(--panel-2);
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+.v2-option.v2-option-selected {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  box-shadow: inset 4px 0 0 var(--primary), 0 8px 18px rgba(37, 99, 235, .08);
+}
+.v2-option-no {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  margin-top: 0;
+}
+.v2-option-selected .v2-option-no {
+  background: var(--primary);
+  color: #fff;
+}
+.v2-option-text { font-size: 14px; line-height: 1.55; }
+
+/* 관리자 사이드바 / 내비게이션 */
+.sidebar {
+  background: #fff;
+  border-right: 1px solid var(--line);
+}
+.sidebar nav { gap: 7px; }
+.nav-btn {
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-weight: 850;
+  border-color: transparent;
+}
+.nav-btn:hover {
+  background: var(--panel-2);
+  border-color: var(--line);
+  color: var(--text);
+}
+.nav-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border-color: var(--primary-line);
+  box-shadow: inset 4px 0 0 var(--primary);
+}
+.badge.admin {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+/* 관리자 필터 영역 */
+.admin-main .filters {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+}
+.admin-main .filters label { color: var(--muted); font-size: 12px; }
+
+/* 데이터 테이블 고급화 */
+.table-wrap {
+  border-radius: var(--radius-lg);
+  overflow: auto;
+}
+table { border-collapse: separate; border-spacing: 0; }
+th, td {
+  border-bottom: 1px solid #edf2f7;
+  padding: 11px 13px;
+}
+th {
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: none;
+  letter-spacing: 0;
+}
+td {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+tbody tr:hover td { background: #f8fbff; }
+.admin-table-fixed th,
+.admin-table-fixed td,
+.admin-result-table td,
+.admin-result-table th { font-size: 13px; }
+.admin-result-table th { color: var(--muted); font-weight: 850; }
+.admin-result-table td.fixed-dept,
+.admin-result-table td.fixed-name { font-weight: 850; }
+
+/* 결과 배지 통일 */
+.pass-circle {
+  height: 28px;
+  min-width: 56px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: -.02em;
+}
+.pass-circle.pass { background: var(--success); color: #fff; border-color: var(--success-dark); }
+.pass-circle.fail { background: var(--danger); color: #fff; border-color: var(--danger-dark); }
+.pass-circle.disq { background: var(--warning); color: #fff; border-color: var(--warning); }
+.badge.success { color: var(--success-dark); background: var(--success-soft); border-color: var(--success-line); }
+.badge.danger { color: var(--danger-dark); background: var(--danger-soft); border-color: var(--danger-line); }
+.badge.warning { color: #92400e; background: var(--warning-soft); border-color: var(--warning-line); }
+
+/* 결과 화면 리포트형 */
+.v2-result-card { max-width: 540px; }
+.v2-result-card.success .v2-result-top {
+  background: linear-gradient(180deg, var(--success-soft) 0%, #fff 100%);
+}
+.v2-result-card.danger .v2-result-top {
+  background: linear-gradient(180deg, var(--danger-soft) 0%, #fff 100%);
+}
+.v2-result-top { padding: 34px 24px 26px; }
+.v2-result-emoji { font-size: 36px; filter: saturate(.95); }
+.v2-result-label { font-size: 30px; letter-spacing: -.04em; }
+.v2-score-num { font-size: 48px; font-weight: 950; letter-spacing: -.05em; }
+.v2-score-gauge-track { height: 9px; background: var(--line); border-radius: 999px; }
+.v2-score-gauge-fill { border-radius: 999px; }
+.v2-result-stats { background: #fff; }
+.v2-result-stat-key { color: var(--muted); }
+
+/* 모달 통일 */
+.modal h2 {
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -.035em;
+  color: var(--text);
+}
+.modal-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.submit-buffer-card { border-radius: 24px; }
+.submit-buffer-spinner {
+  border-color: #dbeafe;
+  border-top-color: var(--primary);
+}
+.submit-buffer-title { color: var(--text); }
+
+/* 애니메이션 정리 */
+.result-final-badge { animation: none !important; }
+.exam-ready-icon { animation-duration: 2.2s; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 모바일 관리자 표 카드형 전환 */
+@media (max-width: 720px) {
+  .admin-main .filters { grid-template-columns: 1fr !important; }
+  .admin-result-table,
+  .admin-result-table thead,
+  .admin-result-table tbody,
+  .admin-result-table tr,
+  .admin-result-table td,
+  .admin-result-table th,
+  .admin-main .table-wrap table,
+  .admin-main .table-wrap thead,
+  .admin-main .table-wrap tbody,
+  .admin-main .table-wrap tr,
+  .admin-main .table-wrap td,
+  .admin-main .table-wrap th {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .admin-main .table-wrap table { min-width: 0 !important; }
+  .admin-main .table-wrap thead { display: none; }
+  .admin-main .table-wrap {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .admin-main .table-wrap tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .admin-main .table-wrap td {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 9px 12px;
+    border-bottom: 1px solid #edf2f7;
+    font-size: 13px;
+  }
+  .admin-main .table-wrap td:last-child { border-bottom: 0; }
+  .admin-main .table-wrap td::before {
+    content: "항목";
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .admin-result-table td:nth-child(1)::before { content: "응시일시"; }
+  .admin-result-table td:nth-child(2)::before { content: "제출일시"; }
+  .admin-result-table td:nth-child(3)::before { content: "소요시간"; }
+  .admin-result-table td:nth-child(4)::before { content: "소속"; }
+  .admin-result-table td:nth-child(5)::before { content: "성명"; }
+  .admin-result-table td:nth-child(6)::before { content: "정답"; }
+  .admin-result-table td:nth-child(7)::before { content: "점수"; }
+  .admin-result-table td:nth-child(8)::before { content: "합불여부"; }
+  .admin-result-table td:nth-child(9)::before { content: "유효기간"; }
+  .admin-result-table td:nth-child(10)::before { content: "탭 전환"; }
+  .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(1)::before { content: "일시/항목"; }
+  .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(2)::before { content: "소속/분류"; }
+  .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(3)::before { content: "성명/내용"; }
+  .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(4)::before { content: "유형/상태"; }
+  .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(5)::before { content: "값"; }
+  .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(6)::before { content: "내용"; }
+  .admin-result-table td.fixed-score,
+  .admin-result-table td.fixed-pass { text-align: left; }
+}
+
+/* ════════════════════════════════════════
+   FINTECH MODERN UI OVERRIDE
+   - Reference-inspired soft blue gradients, glass cards, glow shadows
+   - Keeps existing HTML/JS behavior intact
+   ════════════════════════════════════════ */
+:root {
+  --primary: #3868ff;
+  --primary-dark: #254edb;
+  --primary-soft: #eef4ff;
+  --primary-soft-2: #f7faff;
+  --primary-glow: rgba(56, 104, 255, .24);
+  --success: #18a66a;
+  --success-dark: #0f8f58;
+  --success-soft: #ecfdf5;
+  --danger: #e0475b;
+  --danger-dark: #c83245;
+  --danger-soft: #fff1f3;
+  --warning: #f59e0b;
+  --warning-dark: #d97706;
+  --warning-soft: #fff7ed;
+  --bg: #f3f7ff;
+  --panel: rgba(255,255,255,.92);
+  --panel-2: #f8fbff;
+  --line: rgba(148,163,184,.24);
+  --text: #1e293b;
+  --muted: #718096;
+  --radius: 24px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --shadow: 0 24px 70px rgba(48, 92, 180, .10);
+  --shadow-sm: 0 10px 30px rgba(48, 92, 180, .08);
+  --shadow-card: 0 18px 48px rgba(56, 104, 255, .09);
+  --shadow-glow: 0 16px 42px rgba(56, 104, 255, .20);
+  --focus: 0 0 0 4px rgba(56, 104, 255, .18);
+}
+
+html, body { background: var(--bg); }
+body {
+  background:
+    radial-gradient(circle at 7% 4%, rgba(142, 183, 255, .34), transparent 34%),
+    radial-gradient(circle at 92% 0%, rgba(185, 205, 255, .40), transparent 32%),
+    linear-gradient(180deg, #f7faff 0%, #eef5ff 52%, #f8fbff 100%);
+  color: var(--text);
+  letter-spacing: -.012em;
+}
+
+/* Glass top navigation */
+.topbar,
+.v2-exam-bar,
+.exam-sticky-bar {
+  background: rgba(255,255,255,.74) !important;
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-bottom: 1px solid rgba(148,163,184,.22) !important;
+  box-shadow: 0 10px 35px rgba(56, 104, 255, .08) !important;
+}
+.brand h1 { color: #1e293b; font-weight: 950; letter-spacing: -.035em; }
+.brand-logo,
+.login-banner-logo { filter: drop-shadow(0 8px 20px rgba(56,104,255,.12)); }
+
+/* Universal cards - soft fintech surfaces */
+.card,
+.metric,
+.ready-card,
+.v2-ready-card,
+.v2-question-card,
+.v2-result-card,
+.login-card.v2,
+.table-wrap,
+.modal,
+.submit-buffer-card,
+.result-simple-card {
+  border-color: rgba(148,163,184,.20) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(248,251,255,.94) 100%) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+.card,
+.metric,
+.ready-card,
+.v2-ready-card,
+.v2-result-card,
+.login-card.v2,
+.result-simple-card { border-radius: 26px !important; }
+.v2-question-card,
+.table-wrap { border-radius: 22px !important; }
+.modal,
+.submit-buffer-card { border-radius: 28px !important; box-shadow: 0 28px 90px rgba(33, 70, 150, .24) !important; }
+
+/* Login: refined blue-white gradient */
+.login-wrap {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(80, 140, 255, .20), transparent 34%),
+    radial-gradient(circle at 85% 20%, rgba(185, 205, 255, .34), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #edf4ff 100%) !important;
+}
+.login-card.v2 { overflow: hidden; border: 1px solid rgba(125, 160, 240, .22) !important; }
+.login-card-banner {
+  background:
+    radial-gradient(circle at top right, rgba(56, 104, 255, .14), transparent 36%),
+    linear-gradient(180deg, rgba(255,255,255,.94) 0%, rgba(245,249,255,.92) 100%) !important;
+  border-bottom: 1px solid rgba(148,163,184,.18) !important;
+}
+.login-form input,
+.login-form select,
+input, select, textarea {
+  border-color: rgba(148,163,184,.28) !important;
+  background: rgba(255,255,255,.76) !important;
+  border-radius: 15px !important;
+  transition: border-color .22s ease, box-shadow .22s ease, background .22s ease, transform .22s ease;
+}
+.login-form input:focus,
+.login-form select:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  background: #fff !important;
+  border-color: rgba(56,104,255,.48) !important;
+  box-shadow: 0 0 0 4px rgba(56,104,255,.14), 0 12px 28px rgba(56,104,255,.08) !important;
+}
+
+/* Buttons: no side strips; only soft lift + glow */
+.btn {
+  border-radius: 15px !important;
+  border-color: rgba(148,163,184,.25) !important;
+  background: rgba(255,255,255,.82) !important;
+  color: #1e293b !important;
+  box-shadow: 0 8px 22px rgba(35, 65, 120, .06) !important;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease, background .22s ease, color .22s ease !important;
+}
+.btn:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(56,104,255,.38) !important;
+  box-shadow: 0 16px 38px rgba(56,104,255,.16) !important;
+}
+.btn:active {
+  transform: translateY(0) scale(.99) !important;
+  box-shadow: 0 8px 24px rgba(56,104,255,.22) !important;
+}
+.btn.primary,
+.login-submit-btn,
+.ready-start-btn,
+.v2-submit-final-btn,
+.v2-submit-btn {
+  background: linear-gradient(135deg, #5d8cff 0%, #3868ff 48%, #254edb 100%) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 18px 44px rgba(56,104,255,.28) !important;
+}
+.btn.primary:hover,
+.login-submit-btn:hover,
+.ready-start-btn:hover,
+.v2-submit-final-btn:hover,
+.v2-submit-btn:hover {
+  box-shadow: 0 24px 58px rgba(56,104,255,.34) !important;
+  filter: saturate(1.04);
+}
+.btn.danger {
+  background: rgba(255,241,243,.88) !important;
+  border-color: rgba(224,71,91,.22) !important;
+  color: var(--danger) !important;
+  box-shadow: 0 10px 28px rgba(224,71,91,.08) !important;
+}
+.btn.success {
+  background: rgba(236,253,245,.90) !important;
+  border-color: rgba(24,166,106,.22) !important;
+  color: var(--success-dark) !important;
+  box-shadow: 0 10px 28px rgba(24,166,106,.08) !important;
+}
+
+/* Admin sidebar: active state is glow/shadow, no blue side strip */
+.sidebar {
+  background: rgba(255,255,255,.78) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+.nav-btn {
+  border-radius: 16px !important;
+  background: transparent !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+}
+.nav-btn.active,
+.nav-btn:focus-visible {
+  color: var(--primary-dark) !important;
+  border-color: rgba(56,104,255,.22) !important;
+  background: rgba(255,255,255,.92) !important;
+  box-shadow: 0 14px 36px rgba(56,104,255,.16), 0 0 0 1px rgba(56,104,255,.08) !important;
+}
+.nav-btn.active::before,
+.nav-btn::before { display: none !important; content: none !important; }
+
+/* Exam ready and exam bar */
+.ready-layout { max-width: 680px !important; }
+.ready-card-header,
+.v2-ready-banner,
+.v2-result-top {
+  background:
+    radial-gradient(circle at top right, rgba(56,104,255,.15), transparent 40%),
+    linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%) !important;
+}
+.exam-info-row,
+.v2-stat-row,
+.v2-result-stats { border-color: rgba(148,163,184,.18) !important; }
+.exam-info-item,
+.v2-stat-item,
+.v2-result-stat { border-color: rgba(148,163,184,.18) !important; }
+.v2-exam-progress-track { height: 4px !important; background: rgba(148,163,184,.18) !important; }
+.v2-exam-progress-fill,
+.progress span,
+.ready-gauge-fill {
+  background: linear-gradient(90deg, #76a7ff 0%, #3868ff 100%) !important;
+  box-shadow: 0 0 18px rgba(56,104,255,.28);
+}
+.v2-exam-timer { color: #172033 !important; font-weight: 950 !important; }
+
+/* Save/sync status: polished communication pill */
+.v2-sync-status,
+.sync-pill,
+.exam-sync-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-height: 30px !important;
+  padding: 0 11px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  background: rgba(255,255,255,.78) !important;
+  border: 1px solid rgba(148,163,184,.22) !important;
+  box-shadow: 0 10px 26px rgba(56,104,255,.09) !important;
+}
+.v2-sync-ok,
+.sync-pill.saved { background: rgba(236,253,245,.90) !important; color: var(--success-dark) !important; border-color: rgba(24,166,106,.24) !important; }
+.v2-sync-error,
+.sync-pill.error { background: rgba(255,241,243,.92) !important; color: var(--danger) !important; border-color: rgba(224,71,91,.24) !important; }
+.sync-icon,
+.sync-spinner,
+.sync-status-icon {
+  width: 17px !important;
+  height: 17px !important;
+  flex: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+}
+.sync-icon.saving,
+.sync-spinner,
+.v2-sync-status.saving .sync-status-icon {
+  border: 3px solid rgba(219,234,254,.95) !important;
+  border-top-color: #3868ff !important;
+  animation: spin .82s linear infinite !important;
+  box-shadow: 0 0 16px rgba(56,104,255,.20) !important;
+}
+.sync-icon.saved,
+.v2-sync-ok .sync-status-icon { background: var(--success) !important; color: #fff !important; }
+.sync-icon.error,
+.v2-sync-error .sync-status-icon { background: var(--danger) !important; color: #fff !important; }
+
+/* Question cards and answer choices: selected state uses glow only, no left strip */
+.v2-exam-container { max-width: 760px !important; }
+.v2-question-card {
+  padding: 20px 22px !important;
+  border-radius: 24px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(249,251,255,.96) 100%) !important;
+}
+.v2-question-card.v2-question-answered {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(247,250,255,.96) 100%) !important;
+  border-color: rgba(56,104,255,.16) !important;
+}
+.v2-question-num { color: var(--primary) !important; }
+.v2-question-text { color: #172033 !important; font-weight: 800 !important; }
+.v2-option,
+.option {
+  border-radius: 16px !important;
+  border-color: rgba(148,163,184,.22) !important;
+  background: rgba(255,255,255,.82) !important;
+  box-shadow: 0 7px 20px rgba(35, 65, 120, .04) !important;
+  transition: transform .20s ease, box-shadow .20s ease, border-color .20s ease, background .20s ease !important;
+}
+.v2-option:hover,
+.option:hover,
+.option:focus-within {
+  transform: translateY(-1px) !important;
+  background: #fff !important;
+  border-color: rgba(56,104,255,.26) !important;
+  box-shadow: 0 14px 34px rgba(56,104,255,.12) !important;
+}
+.v2-option.v2-option-selected,
+.option:has(input:checked) {
+  background: #fff !important;
+  border-color: rgba(56,104,255,.55) !important;
+  box-shadow: 0 18px 44px rgba(56,104,255,.18), 0 0 0 3px rgba(56,104,255,.08) !important;
+}
+.v2-option.v2-option-selected::before,
+.option:has(input:checked)::before { display: none !important; content: none !important; }
+.v2-option-no {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 999px !important;
+  background: rgba(241,245,249,.95) !important;
+  color: #64748b !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 950 !important;
+  box-shadow: inset 0 0 0 1px rgba(148,163,184,.18);
+}
+.v2-option-selected .v2-option-no {
+  color: #fff !important;
+  background: linear-gradient(135deg, #76a7ff 0%, #3868ff 100%) !important;
+  box-shadow: 0 8px 18px rgba(56,104,255,.24) !important;
+}
+
+/* Tables: softer modern backoffice */
+.table-wrap { overflow: auto; }
+table { border-collapse: separate !important; border-spacing: 0 !important; }
+th {
+  background: rgba(248,251,255,.92) !important;
+  color: #718096 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-transform: none !important;
+  letter-spacing: -.01em !important;
+  border-bottom: 1px solid rgba(148,163,184,.20) !important;
+}
+td {
+  color: #253044 !important;
+  border-bottom: 1px solid rgba(226,232,240,.72) !important;
+  font-weight: 650 !important;
+}
+tbody tr { transition: background .18s ease, box-shadow .18s ease; }
+tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
+.admin-table-fixed td.fixed-dept,
+.admin-table-fixed td.fixed-name,
+.admin-result-table td.fixed-dept,
+.admin-result-table td.fixed-name { color: #172033 !important; font-weight: 850 !important; }
+.admin-result-table td.fixed-score,
+.admin-table-fixed td.fixed-score { font-weight: 950 !important; }
+
+/* Admin filters and inline forms as floating tool panels */
+.filters,
+.admin-inline-form,
+.affiliation-add-form,
+.admin-main .form-grid {
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 22px;
+  padding: 14px;
+  box-shadow: 0 14px 36px rgba(56,104,255,.07);
+}
+.admin-main .form-grid .field,
+.admin-main .filters .field { margin-bottom: 0; }
+
+/* Unified pass/fail/disqualified status pills */
+.pass-circle,
+.status-badge,
+.badge.success,
+.badge.danger,
+.badge.warning {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 62px !important;
+  height: 30px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  letter-spacing: -.02em !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+.pass-circle.pass,
+.badge.success,
+.status-submitted {
+  background: var(--success-soft) !important;
+  color: var(--success-dark) !important;
+  border-color: rgba(24,166,106,.22) !important;
+}
+.pass-circle.fail,
+.badge.danger,
+.status-disqualified {
+  background: var(--danger-soft) !important;
+  color: var(--danger) !important;
+  border-color: rgba(224,71,91,.22) !important;
+}
+.pass-circle.disq,
+.badge.warning {
+  background: var(--warning-soft) !important;
+  color: var(--warning-dark) !important;
+  border-color: rgba(245,158,11,.26) !important;
+}
+.status-ready { background: #f8fafc !important; color: #64748b !important; border: 1px solid rgba(148,163,184,.22) !important; }
+.status-progress { background: var(--primary-soft) !important; color: var(--primary-dark) !important; border: 1px solid rgba(56,104,255,.20) !important; }
+
+/* Results: clean report card */
+.v2-result-top.success,
+.result-final-badge.success {
+  background: linear-gradient(180deg, rgba(236,253,245,.95) 0%, rgba(255,255,255,.98) 100%) !important;
+}
+.v2-result-top.danger,
+.result-final-badge.danger {
+  background: linear-gradient(180deg, rgba(255,241,243,.95) 0%, rgba(255,255,255,.98) 100%) !important;
+}
+.v2-score-num { font-size: 48px !important; font-weight: 1000 !important; letter-spacing: -.055em !important; }
+.v2-score-gauge-track { background: rgba(148,163,184,.18) !important; height: 10px !important; border-radius: 999px !important; }
+.v2-score-gauge-fill.success { background: linear-gradient(90deg, #52d899 0%, var(--success) 100%) !important; }
+.v2-score-gauge-fill.danger { background: linear-gradient(90deg, #ff8b99 0%, var(--danger) 100%) !important; }
+.result-final-badge { animation: none !important; border-radius: 28px !important; }
+
+/* Notices: soft, readable */
+.notice {
+  border-radius: 18px !important;
+  border-color: rgba(148,163,184,.20) !important;
+  background: rgba(248,251,255,.88) !important;
+}
+.notice.danger { background: var(--danger-soft) !important; border-color: rgba(224,71,91,.22) !important; color: var(--danger) !important; }
+.notice.success { background: var(--success-soft) !important; border-color: rgba(24,166,106,.22) !important; color: var(--success-dark) !important; }
+.notice.warning { background: var(--warning-soft) !important; border-color: rgba(245,158,11,.26) !important; color: var(--warning-dark) !important; }
+
+/* Submit overlay aligned to fintech motion language */
+.submit-buffer-backdrop { background: rgba(28, 47, 92, .38) !important; backdrop-filter: blur(14px) saturate(130%) !important; }
+.submit-buffer-spinner {
+  border-color: rgba(219,234,254,.95) !important;
+  border-top-color: #3868ff !important;
+  box-shadow: 0 0 30px rgba(56,104,255,.26) !important;
+}
+.submit-buffer-progress { background: rgba(226,232,240,.78) !important; }
+.submit-buffer-progress span { background: linear-gradient(90deg, #76a7ff 0%, #3868ff 100%) !important; }
+
+/* Refined mobile table cards */
+@media (max-width: 720px) {
+  .admin-main .table-wrap tr {
+    border-color: rgba(148,163,184,.20) !important;
+    border-radius: 20px !important;
+    background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,255,.96)) !important;
+    box-shadow: 0 18px 44px rgba(56,104,255,.10) !important;
+  }
+  .admin-main .table-wrap td {
+    border-bottom-color: rgba(226,232,240,.78) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .v2-question-card { padding: 16px !important; border-radius: 20px !important; }
+  .v2-option { border-radius: 14px !important; }
+  .topbar { background: rgba(255,255,255,.82) !important; }
+  .filters,
+  .admin-inline-form,
+  .affiliation-add-form,
+  .admin-main .form-grid { border-radius: 18px; padding: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+
+/* === Requested refinement: clean card interiors + minimal pager === */
+/* 1) 카드 내부의 블루 글래스 배경 제거: 로그인 배너/결과 상단/안내 헤더는 카드와 동일한 화이트 톤으로 통일 */
+.login-card-banner,
+.ready-card-header,
+.v2-ready-banner,
+.v2-result-top,
+.v2-result-top.success,
+.v2-result-top.danger,
+.v2-result-card.success .v2-result-top,
+.v2-result-card.danger .v2-result-top {
+  background: rgba(255,255,255,.96) !important;
+  background-image: none !important;
+  border-bottom: 1px solid rgba(148,163,184,.16) !important;
+  box-shadow: none !important;
+}
+.login-card-banner {
+  padding-top: 30px !important;
+  padding-bottom: 20px !important;
+}
+.v2-result-top {
+  padding-top: 34px !important;
+  padding-bottom: 26px !important;
+}
+
+/* 2) 버튼/선택지: 좌측 띠 제거, 글로우/그림자 중심으로 통일 */
+.v2-option.v2-option-selected,
+.nav-btn.active,
+.nav-btn:focus-visible {
+  box-shadow: 0 16px 38px rgba(56,104,255,.16), 0 0 0 1px rgba(56,104,255,.14) !important;
+}
+.v2-option.v2-option-selected {
+  background: rgba(255,255,255,.98) !important;
+  border-color: rgba(56,104,255,.38) !important;
+}
+.v2-option.v2-option-selected::before,
+.nav-btn.active::before,
+.nav-btn::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* 3) 합격/불합격/실격 배지: 동일 도형, 동일 크기, soft tone */
+.pass-circle,
+.badge.success,
+.badge.danger,
+.badge.warning,
+.status-badge {
+  min-width: 58px !important;
+  height: 30px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+.pass-circle.pass,
+.badge.success,
+.status-submitted {
+  background: rgba(236,253,245,.98) !important;
+  color: #15803d !important;
+  border-color: rgba(22,163,74,.18) !important;
+}
+.pass-circle.fail,
+.badge.danger,
+.status-disqualified {
+  background: rgba(254,242,242,.98) !important;
+  color: #dc2626 !important;
+  border-color: rgba(220,38,38,.18) !important;
+}
+.pass-circle.disq,
+.badge.warning {
+  background: rgba(255,247,237,.98) !important;
+  color: #ea580c !important;
+  border-color: rgba(234,88,12,.18) !important;
+}
+
+/* 4) 관리자 페이지네이션: 하단 중앙 숫자형 UI */
+.admin-pager {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 20px 0 4px;
+  padding: 0 2px;
+}
+.admin-pager-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  width: 100%;
+}
+.admin-pager-right,
+.admin-page-size {
+  display: none !important;
+}
+.admin-pager-numbers {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-inline: auto;
+}
+.admin-page-btn {
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(148,163,184,.28) !important;
+  background: rgba(255,255,255,.82) !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+.admin-page-btn:hover:not(:disabled) {
+  color: #111827 !important;
+  border-color: rgba(56,104,255,.28) !important;
+  box-shadow: 0 10px 24px rgba(56,104,255,.10) !important;
+  transform: translateY(-1px) !important;
+}
+.admin-page-btn:disabled {
+  opacity: .28 !important;
+  cursor: not-allowed !important;
+}
+.admin-page-num {
+  min-width: 28px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: color .18s ease, transform .18s ease, text-decoration-color .18s ease;
+}
+.admin-page-num:hover {
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+.admin-page-num.active {
+  color: #111827;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+.admin-page-ellipsis {
+  min-width: 18px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 900;
+}
+.admin-pager-info,
+.admin-pager-actions { display: contents !important; }
+
+@media (max-width: 720px) {
+  .admin-pager { justify-content: center; }
+  .admin-pager-left { width: 100%; justify-content: center; }
+  .admin-pager-numbers { gap: 5px; }
+  .admin-page-num { min-width: 24px; padding: 0 6px; font-size: 13px; }
+}
+
 </style>
 </head>
 <body>
@@ -1830,18 +2994,36 @@ function clearActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
   activeExams = activeExams.filter(item => item.key !== key);
 }
 
+let _activeExamSaveTimer = null;
+let _lastRemoteActiveExamSaveAt = 0;
+
+function cancelScheduledActiveExamSave() {
+  if (_activeExamSaveTimer) {
+    clearTimeout(_activeExamSaveTimer);
+    _activeExamSaveTimer = null;
+  }
+}
+
+function scheduleActiveExamSave() {
+  // 원복: 답안 선택 즉시 서버 저장
+  if (!state.currentExam || state.isSubmitting) return;
+  persistCurrentExam(true);
+}
+
 function persistCurrentExam(saveRemote = true) {
   if (!state.currentExam) return;
   const record = upsertActiveExamRecord(state.currentExam);
   if (saveRemote && record) {
+    updateExamSyncStatus("saving");
     saveActiveExamRecord(record)
       .then(() => {
+        _lastRemoteActiveExamSaveAt = Date.now();
         state.examSaveError = "";
-        updateExamSyncStatus("서버 저장 완료", false);
+        updateExamSyncStatus("saved");
       })
       .catch(error => {
         state.examSaveError = error.message || String(error) || "진행 중 시험 저장 실패";
-        updateExamSyncStatus("답안 저장 실패 - 네트워크를 확인해 주세요", true);
+        updateExamSyncStatus("error");
         console.error("진행 중 시험 서버 저장에 실패했습니다.", error);
       });
   }
@@ -2116,6 +3298,51 @@ async function _sbGetCandidateRuntimeData(employeeId, quarter = getCurrentQuarte
     examResults: (resultRes.data || []).map(_fromExamResultRow),
     activeExams: activeRes.data ? [_mapActiveExamRow(activeRes.data, qbRes.data || [])] : []
   };
+}
+
+
+async function _sbFetchResultsPage({ page = 0, pageSize = 50 } = {}) {
+  if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
+  const start = page * pageSize;
+  const end = start + pageSize - 1;
+  let query = _sb.from("exam_results").select("*", { count: "exact" });
+
+  if (state.filters.resultDepartment && state.filters.resultDepartment !== "전체") {
+    query = query.eq("department", state.filters.resultDepartment);
+  }
+  if (state.filters.resultQuarter && state.filters.resultQuarter !== "전체") {
+    query = query.eq("quarter", state.filters.resultQuarter);
+  }
+  if (state.filters.resultDisqualified === "실격") {
+    query = query.eq("disqualified", true);
+  } else if (state.filters.resultDisqualified === "정상") {
+    query = query.eq("disqualified", false);
+  }
+
+  if (state.filters.resultSort === "scoreDesc") {
+    query = query.order("percentage_score", { ascending: false }).order("submitted_at", { ascending: false });
+  } else if (state.filters.resultSort === "scoreAsc") {
+    query = query.order("percentage_score", { ascending: true }).order("submitted_at", { ascending: false });
+  } else {
+    query = query.order("submitted_at", { ascending: false });
+  }
+
+  const { data, error, count } = await query.range(start, end);
+  if (error) throw error;
+  return { rows: (data || []).map(_fromExamResultRow), total: count || 0 };
+}
+
+async function _sbFetchLogsPage({ page = 0, pageSize = 50 } = {}) {
+  if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
+  const start = page * pageSize;
+  const end = start + pageSize - 1;
+  const { data, error, count } = await _sb
+    .from("activity_logs")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(start, end);
+  if (error) throw error;
+  return { rows: (data || []).map((l) => _mapActivityLogRow(l, users || [])), total: count || 0 };
 }
 
 async function _sbSaveAppData(snapshot) {
@@ -2584,15 +3811,87 @@ function _retryRemoteSave() {
 }
 
 function getPendingSubmissionKey(employeeId, quarter) {
-  return "pending_submission_disabled";
+  return "HNIRUJA_PENDING_SUBMISSION__" + String(employeeId || "") + "__" + String(quarter || getCurrentQuarter());
+}
+
+function getPendingSubmissionMaxAgeMs() {
+  const minutes = Number(examSettings?.timeLimitMinutes || 30);
+  return Math.max(30, minutes + 10) * 60 * 1000;
 }
 
 function savePendingSubmission(result, log) {
-  // 운영 버전: 제출 결과는 로컬에 임시 저장하지 않음
+  try {
+    if (!result?.employeeId || !result?.quarter) return;
+    const payload = {
+      result,
+      log,
+      savedAt: new Date().toISOString(),
+      version: 1
+    };
+    sessionStorage.setItem(getPendingSubmissionKey(result.employeeId, result.quarter), JSON.stringify(payload));
+  } catch (e) {
+    console.warn("임시 제출 데이터 저장 실패", e);
+  }
+}
+
+function clearPendingSubmission(employeeId, quarter) {
+  try {
+    if (employeeId && quarter) {
+      sessionStorage.removeItem(getPendingSubmissionKey(employeeId, quarter));
+      return;
+    }
+    Object.keys(sessionStorage || {}).forEach((key) => {
+      if (key.startsWith("HNIRUJA_PENDING_SUBMISSION__")) sessionStorage.removeItem(key);
+    });
+  } catch (e) {}
+}
+
+function getPendingSubmission(employeeId = "", quarter = "") {
+  try {
+    const keys = Object.keys(sessionStorage || {}).filter((key) => key.startsWith("HNIRUJA_PENDING_SUBMISSION__"));
+    for (const key of keys) {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) continue;
+      const payload = JSON.parse(raw);
+      const result = payload?.result;
+      if (!result?.employeeId || !result?.quarter) {
+        sessionStorage.removeItem(key);
+        continue;
+      }
+      if (employeeId && String(result.employeeId) !== String(employeeId)) continue;
+      if (quarter && String(result.quarter) !== String(quarter)) continue;
+      const savedAt = payload.savedAt ? new Date(payload.savedAt).getTime() : 0;
+      const expired = !savedAt || (Date.now() - savedAt) > getPendingSubmissionMaxAgeMs();
+      if (expired) {
+        sessionStorage.removeItem(key);
+        continue;
+      }
+      return { ...payload, key };
+    }
+  } catch (e) {
+    console.warn("임시 제출 데이터 확인 실패", e);
+  }
+  return null;
 }
 
 async function retryPendingSubmissions(employeeId = "") {
-  // 운영 버전: 로컬 pending 제출 재전송 사용 안 함
+  const pending = getPendingSubmission(employeeId);
+  if (!pending?.result) return { ok: false, skipped: true };
+  try {
+    const res = await appendResultToSheet(pending.result, pending.log);
+    if (!res?.ok) throw new Error(res?.message || "임시 제출 재전송 실패");
+    clearPendingSubmission(pending.result.employeeId, pending.result.quarter);
+
+    const resultExists = examResults.some((r) => r.employeeId === pending.result.employeeId && r.quarter === pending.result.quarter);
+    if (!resultExists) examResults.push(pending.result);
+    if (pending.log && !activityLogs.some((l) => l.logId === pending.log.logId)) activityLogs.push(pending.log);
+    clearActiveExamRecord(pending.result.employeeId, pending.result.quarter);
+
+    return { ok: true, duplicate: !!res?.duplicate, result: pending.result };
+  } catch (e) {
+    console.warn("임시 제출 재전송 실패", e);
+    return { ok: false, message: e.message || String(e), result: pending.result };
+  }
 }
 
 async function _sendExamSubmissionOnce(result, log) {
@@ -2747,6 +4046,8 @@ const state = {
   adminSection: "dashboard",
   theme: "light",
   loginError: "",
+  examSaveError: "",
+  examSyncState: "idle",
   currentExam: null,
   currentQuestionIndex: 0,
   timerId: null,
@@ -2759,6 +4060,26 @@ const state = {
   introTimerId: null,
   introRaf: null,
   _tabHiddenAt: null,
+  adminResultsPage: {
+    page: 0,
+    pageSize: 50,
+    total: 0,
+    rows: [],
+    loading: false,
+    loaded: false,
+    error: "",
+    signature: ""
+  },
+  adminLogsPage: {
+    page: 0,
+    pageSize: 50,
+    total: 0,
+    rows: [],
+    loading: false,
+    loaded: false,
+    error: "",
+    signature: ""
+  },
   filters: {
     userSearch: "",
     userType: "전체",
@@ -2811,7 +4132,7 @@ function renderLoadingScreen(label, percent) {
   app.innerHTML = `
     <main style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:28px;text-align:center;padding:32px;background:var(--bg)">
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-        <img src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="이루자 로고"
+        <img src="./logo.png" alt="이루자 로고"
           style="height:56px;width:auto;object-fit:contain" />
         <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:-0.5px">안전담당자 자격인증제</div>
       </div>
@@ -2919,7 +4240,7 @@ function buildHeader() {
   return `
     <header class="topbar">
       <div class="brand" aria-label="시스템 이름">
-        <img class="brand-logo" src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="에이치앤이루자 로고" />
+        <img class="brand-logo" src="./logo.png" alt="에이치앤이루자 로고" />
         <div>
           <h1>안전담당자 자격인증제</h1>
         </div>
@@ -2941,6 +4262,7 @@ function setTheme(theme) {
 
 function logout() {
   clearTimer();
+  cancelScheduledActiveExamSave();
   removeExamGuards();
   stopAdminAutoRefresh(); // §14: 관리자 자동갱신 타이머 해제
   try { sessionStorage.removeItem("HNIRUJA_SESSION"); } catch(e) {}
@@ -2994,7 +4316,7 @@ function renderLogin() {
     <main class="login-wrap">
       <div class="login-card v2">
         <div class="login-card-banner">
-          <img class="login-banner-logo" src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="로고" />
+          <img class="login-banner-logo" src="./logo.png" alt="로고" />
           <h2 class="login-title">안전담당자 자격인증제</h2>
         </div>
         <div class="login-card-body">
@@ -3056,6 +4378,7 @@ function resetDemoModeState() {
   state.isTestMode = true;
   hideSubmitBuffer();
   clearTimer();
+  cancelScheduledActiveExamSave();
   clearIntroCountdown();
   removeExamGuards();
   removePreExamGuards();
@@ -3147,6 +4470,16 @@ async function handleLogin(event) {
     try {
       updateLoadingProgress(45, "시험 정보를 불러오는 중입니다");
       await loadCandidateRuntimeData(candidate);
+
+      const pendingRetry = await retryPendingSubmissions(candidate.employeeId);
+      if (pendingRetry?.ok && pendingRetry.result) {
+        state.lastResult = pendingRetry.result;
+        state.view = "result";
+        updateLoadingProgress(100, "임시 제출 데이터를 복구했습니다");
+        setTimeout(() => renderResultScreen(), 100);
+        return;
+      }
+
       updateLoadingProgress(100, "완료!");
 
       const currentQuarterResult = examResults
@@ -3711,7 +5044,7 @@ function renderExamScreen() {
           <span class="v2-exam-timer" id="remainingTime">${formatRemainingTime(state.remainingSeconds)}</span>
         </div>
         <div class="v2-exam-bar-right">
-          <span id="examSyncStatus" class="v2-sync-status ${state.examSaveError ? "v2-sync-error" : "v2-sync-ok"}" style="${state.examSaveError ? "display:inline-flex" : "display:none"}">${state.examSaveError ? escapeHtml(state.examSaveError) : ""}</span>
+          <span id="examSyncStatus" class="v2-sync-status v2-sync-${state.examSyncState === "error" ? "error" : state.examSyncState === "saving" ? "saving" : "ok"}" style="${state.examSyncState === "idle" ? "display:none" : "display:inline-flex"}" aria-label="답안 저장 상태">${state.examSyncState === "error" ? "네트워크 불안정" : ""}</span>
           <span class="v2-exam-progress-text">${answeredCount}/${exam.questions.length}</span>
 
         </div>
@@ -3722,7 +5055,7 @@ function renderExamScreen() {
     </div>
 
     <main class="container v2-exam-container">
-      ${state.examSaveError ? `<div class="notice danger" style="margin-bottom:12px">답안 저장 실패: ${escapeHtml(state.examSaveError)}<br>네트워크 또는 서버 연결을 확인한 뒤 계속 응시해 주세요. 제출 시 서버 저장 완료 전에는 결과 화면으로 이동하지 않습니다.</div>` : ""}
+      ${state.examSaveError ? `<div class="notice danger" style="margin-bottom:12px">네트워크 불안정<br>답안 임시 저장에 실패했습니다. 연결 상태를 확인해 주세요. 최종 제출은 서버 저장 완료 전까지 결과 화면으로 이동하지 않습니다.</div>` : ""}
       ${questionsHtml}
       <div class="v2-submit-bottom">
         <button class="btn v2-submit-final-btn" id="bottomSubmitBtn" type="button"
@@ -3955,12 +5288,18 @@ function hideSubmitBuffer() {
   const root = document.getElementById("submitBufferRoot");
   if (root) root.innerHTML = "";
 }
-function updateExamSyncStatus(message, isError = false) {
+function updateExamSyncStatus(status, isError = false) {
+  let next = "idle";
+  if (isError || status === "error") next = "error";
+  else if (status === "saving") next = "saving";
+  else if (status === "saved" || status) next = "ok";
+
+  state.examSyncState = next;
   const el = document.getElementById("examSyncStatus");
   if (!el) return;
-  el.className = isError ? "v2-sync-status v2-sync-error" : "v2-sync-status v2-sync-ok";
-  el.textContent = message || "";
-  el.style.display = message ? "inline-flex" : "none";
+  el.className = "v2-sync-status " + (next === "error" ? "v2-sync-error" : next === "saving" ? "v2-sync-saving" : "v2-sync-ok");
+  el.textContent = next === "error" ? "네트워크 불안정" : "";
+  el.style.display = next === "idle" ? "none" : "inline-flex";
 }
 
 
@@ -3974,6 +5313,7 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
   // §7: 프론트 중복 제출 방지
   if (!state.currentExam || state.isSubmitting) return;
   state.isSubmitting = true;
+  cancelScheduledActiveExamSave();
 
   const _submitBtn = document.getElementById("submitExamBtn");
   if (_submitBtn) { _submitBtn.disabled = true; _submitBtn.textContent = "제출 중..."; }
@@ -4049,9 +5389,11 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
 
   try {
     if (!state.isTestMode) {
+      savePendingSubmission(result, submitLog);
       updateSubmitBuffer("서버에 답안과 결과를 저장하고 있습니다.");
       const saveResult = await appendResultToSheet(result, submitLog);
       if (!saveResult?.ok) throw new Error(saveResult?.message || "서버 저장에 실패했습니다. 다시 제출해 주세요.");
+      clearPendingSubmission(result.employeeId, result.quarter);
       updateSubmitBuffer("전송 완료를 확인했습니다. 결과 화면을 준비합니다.");
       examResults.push(result);
       activityLogs.push(submitLog);
@@ -4070,7 +5412,7 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
     }, 250);
   } catch (error) {
     console.error(error);
-    showSubmitBuffer("전송 실패: 네트워크 또는 서버 상태를 확인한 뒤 다시 시도해 주세요.", error.message || String(error));
+    showSubmitBuffer("네트워크 불안정으로 제출 저장에 실패했습니다. 연결 상태를 확인한 뒤 다시 제출해 주세요.", error.message || String(error));
     state.isSubmitting = false;
     if (_submitBtn) { _submitBtn.disabled = false; _submitBtn.textContent = "최종 제출"; }
   }
@@ -4142,88 +5484,116 @@ function renderResultScreen() {
       </section>
     </main>
   `;
+
+  if (passed) {
+    requestAnimationFrame(() => launchConfetti(4000));
+  }
 }
 
 
-function launchConfetti() {
-  // 기존 캔버스 제거
-  const existing = document.getElementById('confettiCanvas');
+function launchConfetti(duration = 4000) {
+  const existing = document.getElementById("confettiCanvas");
   if (existing) existing.remove();
 
-  const canvas = document.createElement('canvas');
-  canvas.id = 'confettiCanvas';
-  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.id = "confettiCanvas";
+  canvas.setAttribute("aria-hidden", "true");
+  canvas.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999;";
   document.body.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
 
-  const colors = ['#4f8ef7','#f7c948','#f74f4f','#4ff7a1','#c44ff7','#f7924f','#ff69b4','#00e5ff','#ffeb3b','#76ff03'];
-  const shapes = ['rect','circle','ribbon'];
+  const ctx = canvas.getContext("2d");
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const colors = ["#2563eb", "#60a5fa", "#93c5fd", "#16a34a", "#86efac", "#facc15", "#fb7185", "#a78bfa"];
+  const particles = [];
+  let animationId = 0;
+  let startTime = performance.now();
+  let lastBurst = 0;
 
-  const particles = Array.from({length: 280}, () => ({
-    x: Math.random() * canvas.width,
-    y: -20 - Math.random() * canvas.height * 0.5,
-    w: 6 + Math.random() * 10,
-    h: 4 + Math.random() * 6,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    shape: shapes[Math.floor(Math.random() * shapes.length)],
-    vx: (Math.random() - 0.5) * 4,
-    vy: 2 + Math.random() * 5,
-    angle: Math.random() * Math.PI * 2,
-    spin: (Math.random() - 0.5) * 0.25,
-    alpha: 1,
-    gravity: 0.08 + Math.random() * 0.06
-  }));
-
-  let frame = 0;
-  const maxFrames = 240;
-
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    particles.forEach(p => {
-      ctx.save();
-      ctx.globalAlpha = p.alpha;
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      ctx.fillStyle = p.color;
-      if (p.shape === 'rect') {
-        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
-      } else if (p.shape === 'circle') {
-        ctx.beginPath();
-        ctx.arc(0, 0, p.w/2, 0, Math.PI*2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(-p.w/2, 0);
-        ctx.quadraticCurveTo(0, -p.h, p.w/2, 0);
-        ctx.quadraticCurveTo(0, p.h, -p.w/2, 0);
-        ctx.fill();
-      }
-      ctx.restore();
-      p.vy += p.gravity;
-      p.x += p.vx + Math.sin(frame * 0.05 + p.vy) * 0.8;
-      p.y += p.vy;
-      p.angle += p.spin;
-      if (frame > 140) p.alpha = Math.max(0, p.alpha - 0.008);
-    });
-    frame++;
-    if (frame < maxFrames) requestAnimationFrame(draw);
-    else canvas.remove();
+  function resizeCanvas() {
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  // 3번 연속 발사
-  draw();
-  setTimeout(() => {
-    particles.forEach(p => { p.y = -20 - Math.random() * 80; p.alpha = 1; p.vy = 1 + Math.random() * 4; });
-    frame = 0;
-    draw();
-  }, 600);
-  setTimeout(() => {
-    particles.forEach(p => { p.y = -20 - Math.random() * 120; p.alpha = 1; p.vy = 1 + Math.random() * 4; });
-    frame = 0;
-    draw();
-  }, 1200);
+  function addBurst(originX, originY, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = (-Math.PI / 2) + (Math.random() - 0.5) * 1.55;
+      const speed = 5 + Math.random() * 8;
+      particles.push({
+        x: originX + (Math.random() - 0.5) * 26,
+        y: originY + (Math.random() - 0.5) * 12,
+        vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 2.2,
+        vy: Math.sin(angle) * speed - Math.random() * 2,
+        w: 5 + Math.random() * 8,
+        h: 8 + Math.random() * 12,
+        r: 2 + Math.random() * 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotate: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.28,
+        gravity: 0.12 + Math.random() * 0.06,
+        drag: 0.985 + Math.random() * 0.01,
+        alpha: 1,
+        shape: Math.random() > 0.22 ? "rect" : "circle"
+      });
+    }
+  }
+
+  function drawParticle(p) {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotate);
+    ctx.fillStyle = p.color;
+    if (p.shape === "circle") {
+      ctx.beginPath();
+      ctx.arc(0, 0, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    }
+    ctx.restore();
+  }
+
+  function tick(now) {
+    const elapsed = now - startTime;
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+    if (elapsed < 1350 && now - lastBurst > 220) {
+      addBurst(window.innerWidth * 0.25, window.innerHeight + 8, 22);
+      addBurst(window.innerWidth * 0.50, window.innerHeight + 8, 28);
+      addBurst(window.innerWidth * 0.75, window.innerHeight + 8, 22);
+      lastBurst = now;
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.vx *= p.drag;
+      p.vy = p.vy * p.drag + p.gravity;
+      p.x += p.vx + Math.sin((elapsed / 120) + p.y * 0.01) * 0.28;
+      p.y += p.vy;
+      p.rotate += p.spin;
+      if (elapsed > duration * 0.58) p.alpha -= 0.018;
+      drawParticle(p);
+      if (p.alpha <= 0 || p.y > window.innerHeight + 80) particles.splice(i, 1);
+    }
+
+    if (elapsed < duration && particles.length) {
+      animationId = requestAnimationFrame(tick);
+    } else {
+      canvas.remove();
+      window.removeEventListener("resize", resizeCanvas);
+    }
+  }
+
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+  addBurst(window.innerWidth * 0.33, window.innerHeight + 8, 45);
+  addBurst(window.innerWidth * 0.66, window.innerHeight + 8, 45);
+  animationId = requestAnimationFrame(tick);
 }
 
 
@@ -5704,334 +7074,104 @@ function updateExamSettings(event) {
 
 // 책임: 응시 결과 목록, 필터, 정렬
 
-function renderResultsManager() {
-  const rows     = sortByDateDesc(filterResults(), r => r.submittedAt);
-  const quarters = [...new Set(examResults.map(r => r.quarter))].sort((a,b) => String(b).localeCompare(String(a), "ko"));
-  const grouped = rows.reduce((acc, row) => {
-    const key = row.quarter || "분기 미지정";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(row);
-    return acc;
-  }, {});
-  const visibleQuarters = Object.keys(grouped).sort().reverse();
-
-  return `
-    <section class="card">
-      <div class="section-head">
-        <div>
-          <h2>결과 관리</h2>
-        </div>
-        <button id="refreshBtn" class="btn" type="button" onclick="refreshFromRemote()">⟳ 새로고침</button>
-      </div>
-
-      <div class="filters">
-        <div class="field">
-          <label for="resultDepartment">소속</label>
-          <select id="resultDepartment" onchange="state.filters.resultDepartment=this.value; renderAdminDashboard();">
-            ${optionHtml("전체", state.filters.resultDepartment)}
-            ${getDepartments().map(dep => optionHtml(dep, state.filters.resultDepartment)).join("")}
-          </select>
-        </div>
-        <div class="field">
-          <label for="resultQuarter">분기</label>
-          <select id="resultQuarter" onchange="state.filters.resultQuarter=this.value; renderAdminDashboard();">
-            ${optionHtml("전체", state.filters.resultQuarter)}
-            ${quarters.map(q => optionHtml(q, state.filters.resultQuarter)).join("")}
-          </select>
-        </div>
-        <div class="field">
-          <label for="resultDisqualified">실격 여부</label>
-          <select id="resultDisqualified" onchange="state.filters.resultDisqualified=this.value; renderAdminDashboard();">
-            ${["전체", "실격", "정상"].map(v => optionHtml(v, state.filters.resultDisqualified)).join("")}
-          </select>
-        </div>
-        <div class="field">
-          <label for="resultSort">정렬</label>
-          <select id="resultSort" onchange="state.filters.resultSort=this.value; renderAdminDashboard();">
-            ${optionHtml("dateDesc",  state.filters.resultSort, "최신순")}
-            ${optionHtml("scoreDesc", state.filters.resultSort, "점수 높은 순")}
-            ${optionHtml("scoreAsc",  state.filters.resultSort, "점수 낮은 순")}
-          </select>
-        </div>
-        <button class="btn" type="button" onclick="resetResultFilters()">초기화</button>
-      </div>
-
-      ${visibleQuarters.map(quarter => `
-        <section class="quarter-result-block">
-          <div class="quarter-title">
-            <h3>${escapeHtml(quarter)}</h3>
-            <span class="badge">${grouped[quarter].length}건</span>
-          </div>
-          <div class="table-wrap">
-            <table class="admin-result-table">
-              <colgroup>
-                <col style="width:140px"><col style="width:140px"><col style="width:86px">
-                <col style="width:170px"><col style="width:116px"><col style="width:78px">
-                <col style="width:82px"><col style="width:96px"><col style="width:214px"><col style="width:84px">
-              </colgroup>
-              <thead>
-                <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>합불여부</th><th>자격 유효기간</th><th>탭 전환</th></tr>
-              </thead>
-              <tbody>
-                ${grouped[quarter].map(raw => {
-                  const r = getRegradedResult(raw);
-                  const validity = getCertificationValidity(r);
-                  return `
-                  <tr>
-                    <td>${r.startedAt ? formatDateTime(r.startedAt) : "-"}</td>
-                    <td>${formatDateTime(r.submittedAt)}</td>
-                    <td>${(r.startedAt && r.submittedAt) ? (() => { const mins = Math.round((new Date(r.submittedAt) - new Date(r.startedAt)) / 60000); return mins + "분"; })() : "-"}</td>
-                    <td class="fixed-dept">${escapeHtml(r.department)}</td>
-                    <td class="fixed-name">${escapeHtml(r.name)}</td>
-                    <td>${r.correctCount}/${r.totalCount}</td>
-                    <td class="fixed-score"><strong>${r.percentageScore}점</strong></td>
-                    <td class="fixed-pass">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
-                    <td>${validity ? `${formatDateOnly(validity.validFrom)} ~ ${formatDateOnly(validity.validUntil)}` : "-"}</td>
-                    <td>${r.tabSwitchCount ?? 0}회</td>
-                  </tr>`;
-                }).join("")}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      `).join("") || `<div class="empty">조건에 맞는 결과가 없습니다.</div>`}
-    </section>
-  `;
-}
-
-function filterResults() {
-  let rows = examResults.filter(r => {
-    const depOk  = state.filters.resultDepartment === "전체" || r.department === state.filters.resultDepartment;
-    const qOk    = state.filters.resultQuarter    === "전체" || r.quarter    === state.filters.resultQuarter;
-    const disqOk = state.filters.resultDisqualified === "전체" ||
-      (state.filters.resultDisqualified === "실격" &&  r.disqualified) ||
-      (state.filters.resultDisqualified === "정상" && !r.disqualified);
-    return depOk && qOk && disqOk;
+function getAdminResultsSignature() {
+  return JSON.stringify({
+    department: state.filters.resultDepartment || "전체",
+    quarter: state.filters.resultQuarter || "전체",
+    disqualified: state.filters.resultDisqualified || "전체",
+    sort: state.filters.resultSort || "dateDesc",
+    pageSize: 50
   });
-
-  if      (state.filters.resultSort === "scoreDesc") rows.sort((a, b) => getRegradedResult(b).percentageScore - getRegradedResult(a).percentageScore);
-  else if (state.filters.resultSort === "scoreAsc")  rows.sort((a, b) => getRegradedResult(a).percentageScore - getRegradedResult(b).percentageScore);
-  else                                               rows.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-  return rows;
 }
 
-function resetResultFilters() {
-  state.filters.resultDepartment   = "전체";
-  state.filters.resultQuarter      = "전체";
-  state.filters.resultSort         = "dateDesc";
-  state.filters.resultDisqualified = "전체";
+function getAdminLogsSignature() {
+  return JSON.stringify({ pageSize: 50 });
+}
+
+function resetAdminResultsPage() {
+  state.adminResultsPage.page = 0;
+  state.adminResultsPage.loaded = false;
+  state.adminResultsPage.rows = [];
+}
+
+function resetAdminLogsPage() {
+  state.adminLogsPage.page = 0;
+  state.adminLogsPage.loaded = false;
+  state.adminLogsPage.rows = [];
+}
+
+function onAdminResultFilterChange(field, value) {
+  state.filters[field] = value;
+  resetAdminResultsPage();
   renderAdminDashboard();
 }
 
+function setAdminResultsPageSize(value) {
+  state.adminResultsPage.pageSize = Number(value) || 50;
+  resetAdminResultsPage();
+  renderAdminDashboard();
+}
 
-/* ── js/adminStats.js ── */
-"use strict";
+function setAdminLogsPageSize(value) {
+  state.adminLogsPage.pageSize = Number(value) || 50;
+  resetAdminLogsPage();
+  renderAdminDashboard();
+}
 
-// 책임: 통계 시각화 (점수 분포, 부서별 평균, 합격 비율, 카테고리 문항 수)
+function changeAdminResultsPage(delta) {
+  const maxPage = Math.max(0, Math.ceil((state.adminResultsPage.total || 0) / state.adminResultsPage.pageSize) - 1);
+  state.adminResultsPage.page = Math.min(maxPage, Math.max(0, state.adminResultsPage.page + delta));
+  state.adminResultsPage.loaded = false;
+  renderAdminDashboard();
+}
 
-function renderStatsManager() {
-  const currentResults = examResults.filter(r => r.quarter === getCurrentQuarter()).map(getRegradedResult);
-  const scoreDist      = getScoreDistribution(examResults);
-  const categoryCounts = getCategoryCounts().map(item => ({ label: item.category, value: item.count }));
-  const statusRatio    = [
-    { label: "합격",   value: examResults.map(getRegradedResult).filter(r =>  r.passed && !r.disqualified).length },
-    { label: "불합격", value: examResults.map(getRegradedResult).filter(r => !r.passed && !r.disqualified).length },
-    { label: "실격",   value: examResults.map(getRegradedResult).filter(r =>  r.disqualified).length }
-  ];
-  const deptAvg = getDepartments().map(dep => {
-    const rows = examResults.filter(r => r.department === dep).map(getRegradedResult);
-    const avg  = rows.length ? Math.round(rows.reduce((sum, r) => sum + r.percentageScore, 0) / rows.length) : 0;
-    return { label: dep, value: avg };
+function changeAdminLogsPage(delta) {
+  const maxPage = Math.max(0, Math.ceil((state.adminLogsPage.total || 0) / state.adminLogsPage.pageSize) - 1);
+  state.adminLogsPage.page = Math.min(maxPage, Math.max(0, state.adminLogsPage.page + delta));
+  state.adminLogsPage.loaded = false;
+  renderAdminDashboard();
+}
+
+function renderAdminPager(pageState, type) {
+  const total = Number(pageState.total || 0);
+  const page = Number(pageState.page || 0);
+  const pageSize = 50;
+  const maxPage = Math.max(0, Math.ceil(total / pageSize) - 1);
+  const changeFn = type === "logs" ? "changeAdminLogsPage" : "changeAdminResultsPage";
+  const goFn = type === "logs" ? "goAdminLogsPage" : "goAdminResultsPage";
+
+  const makePageButton = (p) => `
+    <button class="admin-page-num ${p === page ? "active" : ""}" type="button" onclick="${goFn}(${p})" aria-label="${p + 1}페이지">${p + 1}</button>`;
+
+  let pages = [];
+  if (maxPage <= 6) {
+    for (let i = 0; i <= maxPage; i++) pages.push(i);
+  } else {
+    const set = new Set([0, maxPage, page - 1, page, page + 1]);
+    if (page <= 2) [1, 2, 3].forEach((p) => set.add(p));
+    if (page >= maxPage - 2) [maxPage - 3, maxPage - 2, maxPage - 1].forEach((p) => set.add(p));
+    pages = [...set].filter((p) => p >= 0 && p <= maxPage).sort((a, b) => a - b);
+  }
+
+  let pageHtml = "";
+  let prev = -1;
+  pages.forEach((p) => {
+    if (prev >= 0 && p - prev > 1) pageHtml += `<span class="admin-page-ellipsis">…</span>`;
+    pageHtml += makePageButton(p);
+    prev = p;
   });
 
   return `
-    <section class="section-head">
-      <div>
-        <h2>통계 시각화</h2>
-      </div>
-    </section>
-
-    <div class="grid two">
-      <section class="card">
-        <div class="section-head"><h3>점수 분포 바 차트</h3></div>
-        ${renderBarChart(scoreDist)}
-      </section>
-      <section class="card">
-        <div class="section-head"><h3>소속별 평균 점수</h3></div>
-        ${renderBarChart(deptAvg)}
-      </section>
-      <section class="card">
-        <div class="section-head"><h3>합격/불합격/실격 비율</h3></div>
-        ${renderBarChart(statusRatio)}
-      </section>
-      <section class="card">
-        <div class="section-head"><h3>카테고리별 문항 수</h3></div>
-        ${renderBarChart(categoryCounts)}
-      </section>
-    </div>
-
-    <section class="card" style="margin-top:16px">
-      <div class="section-head"><h3>이번 분기 요약</h3></div>
-      <div class="grid three">
-        <div class="metric"><div class="label">이번 분기 결과 수</div><div class="value">${currentResults.length}</div></div>
-        <div class="metric"><div class="label">최고 점수</div><div class="value">${currentResults.length ? Math.max(...currentResults.map(r => r.percentageScore)) : 0}</div></div>
-        <div class="metric"><div class="label">실격자</div><div class="value">${currentResults.filter(r => r.disqualified).length}</div></div>
-      </div>
-    </section>
-  `;
-}
-
-
-/* ── js/adminLogs.js ── */
-"use strict";
-
-// 책임: 응시 로그 목록 (최신순 정렬, 관리자 전용)
-
-function renderLogManager() {
-  const logs = sortByDateDesc(activityLogs, l => l.createdAt);
-  return `
-    <section class="card">
-      <div class="section-head">
-        <div>
-          <h2>응시 로그</h2>
+    <div class="admin-pager">
+      <div class="admin-pager-left">
+        <div class="admin-pager-numbers" aria-label="페이지 이동">
+          <button class="admin-page-btn" type="button" onclick="${goFn}(0)" ${page <= 0 ? "disabled" : ""} aria-label="처음 페이지">«</button>
+          <button class="admin-page-btn" type="button" onclick="${changeFn}(-1)" ${page <= 0 ? "disabled" : ""} aria-label="이전 페이지">‹</button>
+          ${pageHtml}
+          <button class="admin-page-btn" type="button" onclick="${changeFn}(1)" ${page >= maxPage ? "disabled" : ""} aria-label="다음 페이지">›</button>
+          <button class="admin-page-btn" type="button" onclick="${goFn}(${maxPage})" ${page >= maxPage ? "disabled" : ""} aria-label="마지막 페이지">»</button>
         </div>
-        <button id="refreshBtn" class="btn" type="button" onclick="refreshFromRemote()">⟳ 새로고침</button>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>일시</th><th>소속</th><th>성명</th><th>유형</th><th>탭 전환 횟수</th><th>내용</th></tr>
-          </thead>
-          <tbody>
-            ${logs.map(log => `
-              <tr>
-                <td>${formatDateTime(log.createdAt)}</td>
-                <td>${escapeHtml(log.department || "-")}</td>
-                <td>${escapeHtml(log.name)}</td>
-                <td>
-                  <span class="badge ${
-                    String(log.type).includes("DISQUALIFIED") ? "danger" :
-                    String(log.type).includes("WARNING")      ? "warning" : "success"
-                  }">${escapeHtml(log.type)}</span>
-                </td>
-                <td>${log.tabSwitchCount ?? 0}</td>
-                <td>${escapeHtml(log.message)}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
+    </div>`;
 }
 
-</script>
-
-  <script>
-    // ── 앱 진입점 ──
-    function restoreExamFromActiveRecord(user) {
-      return restoreActiveExamRecord(getActiveExamRecord(user.employeeId));
-    }
-
-    function initApp() {
-      _initSampleData();
-
-      let savedSession = null;
-      try {
-        const saved = sessionStorage.getItem("HNIRUJA_SESSION");
-        if (saved) savedSession = JSON.parse(saved);
-      } catch(e) {}
-
-      // 새로고침 직후 탭전환 오감지 방지 플래그
-      window._appJustLoaded = true;
-      setTimeout(() => { window._appJustLoaded = false; }, 800);
-
-      state.view = "loading";
-      renderLoadingScreen("로그인 정보를 불러오는 중입니다", 30);
-
-      if (!(isAppsScriptRuntime() || isExternalApiRuntime())) {
-        state.loginError = "서버 연결을 사용할 수 없습니다. Supabase 연결 상태를 확인해 주세요.";
-        state.view = "login";
-        render();
-        return;
-      }
-
-      const finishLoginScreen = () => {
-        state.view = "login";
-        render();
-      };
-
-      loadInitialData(async (ok) => {
-        if (!ok) {
-          finishLoginScreen();
-          return;
-        }
-
-        if (!savedSession?.user || !savedSession?.view) {
-          finishLoginScreen();
-          return;
-        }
-
-        state.currentUser  = savedSession.user;
-        state.adminSection = savedSession.adminSection || "dashboard";
-        state.isTestMode   = false;
-
-        // 관리자는 관리자 데이터가 필요하므로 이때만 전체 데이터를 로드합니다.
-        if (savedSession.user.role === "admin" || savedSession.view === "admin") {
-          renderLoadingScreen("관리자 데이터를 불러오는 중입니다", 60);
-          loadRemoteData((adminOk) => {
-            if (!adminOk) {
-              state.currentUser = null;
-              finishLoginScreen();
-              return;
-            }
-            state.view = "admin";
-            render();
-          });
-          return;
-        }
-
-        try {
-          renderLoadingScreen("응시 정보를 확인하는 중입니다", 60);
-          await loadCandidateRuntimeData(savedSession.user);
-
-          let restored = false;
-          if (savedSession.view === "exam") {
-            restored = restoreExamFromActiveRecord(savedSession.user);
-            if (!restored) state.view = "candidate";
-          } else if (savedSession.view === "result") {
-            const empId = savedSession.user.employeeId;
-            const serverResult = examResults
-              .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
-              .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
-            if (serverResult) {
-              state.lastResult = serverResult;
-              state.view = "result";
-              restored = true;
-            } else {
-              state.lastResult = null;
-              state.view = "candidate";
-            }
-          } else {
-            state.view = savedSession.view === "candidate" ? "candidate" : "login";
-            restored = state.view !== "login";
-          }
-
-          if (!restored && state.view !== "candidate") state.view = "login";
-          render();
-          if (state.view === "exam" && state.currentExam) {
-            setTimeout(() => { startTimer(); }, 100);
-          }
-        } catch (e) {
-          console.error("세션 복원 실패", e);
-          state.currentUser = null;
-          state.loginError = "세션을 복원하지 못했습니다. 다시 로그인해 주세요.";
-          finishLoginScreen();
-        }
-      });
-    }
-
-    initApp();
-  </script>
-</body>
-</html>
