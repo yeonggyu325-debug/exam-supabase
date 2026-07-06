@@ -2567,38 +2567,26 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
   border-color: rgba(234,88,12,.18) !important;
 }
 
-/* 4) 관리자 페이지네이션: 메일함/모던 SaaS형 미니멀 UI */
+/* 4) 관리자 페이지네이션: 중앙 정렬형 미니멀 UI */
 .admin-pager {
-  display: grid !important;
-  grid-template-columns: 1fr auto;
+  display: flex !important;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  gap: 12px;
   margin: 18px 0 4px;
   padding: 0 2px;
+  width: 100%;
 }
 .admin-pager-left {
   display: flex;
   align-items: center;
+  justify-content: center;
   min-height: 34px;
+  width: 100%;
 }
-.admin-pager-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
+.admin-pager-right,
 .admin-page-size {
-  width: auto !important;
-  min-width: 62px !important;
-  min-height: 30px !important;
-  height: 30px !important;
-  padding: 3px 24px 3px 9px !important;
-  border-radius: 6px !important;
-  border: 1px solid rgba(15,23,42,.18) !important;
-  background: #fff !important;
-  color: #111827 !important;
-  font-size: 12px !important;
-  font-weight: 800 !important;
-  box-shadow: none !important;
+  display: none !important;
 }
 .admin-pager-numbers {
   display: inline-flex;
@@ -2665,12 +2653,7 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
 .admin-pager-actions { display: contents !important; }
 
 @media (max-width: 720px) {
-  .admin-pager {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    gap: 10px;
-  }
-  .admin-pager-right { order: -1; width: 100%; justify-content: flex-end; }
+  .admin-pager { justify-content: center; gap: 10px; }
   .admin-pager-left { width: 100%; justify-content: center; }
   .admin-pager-numbers { gap: 5px; }
   .admin-page-num { min-width: 24px; padding: 0 6px; font-size: 13px; }
@@ -4149,7 +4132,7 @@ function renderLoadingScreen(label, percent) {
   app.innerHTML = `
     <main style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:28px;text-align:center;padding:32px;background:var(--bg)">
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-        <img src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="이루자 로고"
+        <img src="./logo.png" alt="이루자 로고"
           style="height:56px;width:auto;object-fit:contain" />
         <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:-0.5px">안전담당자 자격인증제</div>
       </div>
@@ -4257,7 +4240,7 @@ function buildHeader() {
   return `
     <header class="topbar">
       <div class="brand" aria-label="시스템 이름">
-        <img class="brand-logo" src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="에이치앤이루자 로고" />
+        <img class="brand-logo" src="./logo.png" alt="에이치앤이루자 로고" />
         <div>
           <h1>안전담당자 자격인증제</h1>
         </div>
@@ -4333,7 +4316,7 @@ function renderLogin() {
     <main class="login-wrap">
       <div class="login-card v2">
         <div class="login-card-banner">
-          <img class="login-banner-logo" src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="로고" />
+          <img class="login-banner-logo" src="./logo.png" alt="로고" />
           <h2 class="login-title">안전담당자 자격인증제</h2>
         </div>
         <div class="login-card-body">
@@ -5508,7 +5491,7 @@ function renderResultScreen() {
 }
 
 
-function launchConfetti(duration = 6000) {
+function launchConfetti(duration = 4000) {
   const existing = document.getElementById("confettiCanvas");
   if (existing) existing.remove();
 
@@ -7124,13 +7107,13 @@ function onAdminResultFilterChange(field, value) {
 }
 
 function setAdminResultsPageSize(value) {
-  state.adminResultsPage.pageSize = Number(value) || 50;
+  state.adminResultsPage.pageSize = 50;
   resetAdminResultsPage();
   renderAdminDashboard();
 }
 
 function setAdminLogsPageSize(value) {
-  state.adminLogsPage.pageSize = Number(value) || 50;
+  state.adminLogsPage.pageSize = 50;
   resetAdminLogsPage();
   renderAdminDashboard();
 }
@@ -7150,13 +7133,11 @@ function changeAdminLogsPage(delta) {
 }
 
 function renderAdminPager(pageState, type) {
-  const pageSizeOptions = [25, 50, 100].map((n) => optionHtml(String(n), String(pageState.pageSize), String(n))).join("");
   const total = Number(pageState.total || 0);
   const page = Number(pageState.page || 0);
-  const pageSize = Number(pageState.pageSize || 50);
+  const pageSize = 50;
   const maxPage = Math.max(0, Math.ceil(total / pageSize) - 1);
   const changeFn = type === "logs" ? "changeAdminLogsPage" : "changeAdminResultsPage";
-  const sizeFn = type === "logs" ? "setAdminLogsPageSize" : "setAdminResultsPageSize";
   const goFn = type === "logs" ? "goAdminLogsPage" : "goAdminResultsPage";
 
   const makePageButton = (p) => `
@@ -7190,9 +7171,6 @@ function renderAdminPager(pageState, type) {
           <button class="admin-page-btn" type="button" onclick="${changeFn}(1)" ${page >= maxPage ? "disabled" : ""} aria-label="다음 페이지">›</button>
           <button class="admin-page-btn" type="button" onclick="${goFn}(${maxPage})" ${page >= maxPage ? "disabled" : ""} aria-label="마지막 페이지">»</button>
         </div>
-      </div>
-      <div class="admin-pager-right">
-        <select class="admin-page-size" onchange="${sizeFn}(this.value)" aria-label="페이지당 표시 개수">${pageSizeOptions}</select>
       </div>
     </div>`;
 }
