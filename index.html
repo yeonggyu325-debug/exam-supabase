@@ -2567,32 +2567,44 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
   border-color: rgba(234,88,12,.18) !important;
 }
 
-/* 4) 관리자 페이지네이션: 하단 중앙 숫자형 UI */
+/* 4) 관리자 페이지네이션: 메일함/모던 SaaS형 미니멀 UI */
 .admin-pager {
-  display: flex !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  margin: 20px 0 4px;
+  gap: 14px;
+  margin: 18px 0 4px;
   padding: 0 2px;
 }
 .admin-pager-left {
   display: flex;
   align-items: center;
-  justify-content: center;
   min-height: 34px;
-  width: 100%;
 }
-.admin-pager-right,
+.admin-pager-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 .admin-page-size {
-  display: none !important;
+  width: auto !important;
+  min-width: 62px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 3px 24px 3px 9px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(15,23,42,.18) !important;
+  background: #fff !important;
+  color: #111827 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
 }
 .admin-pager-numbers {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-inline: auto;
 }
 .admin-page-btn {
   min-width: 32px !important;
@@ -2653,7 +2665,12 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
 .admin-pager-actions { display: contents !important; }
 
 @media (max-width: 720px) {
-  .admin-pager { justify-content: center; }
+  .admin-pager {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 10px;
+  }
+  .admin-pager-right { order: -1; width: 100%; justify-content: flex-end; }
   .admin-pager-left { width: 100%; justify-content: center; }
   .admin-pager-numbers { gap: 5px; }
   .admin-page-num { min-width: 24px; padding: 0 6px; font-size: 13px; }
@@ -4132,7 +4149,7 @@ function renderLoadingScreen(label, percent) {
   app.innerHTML = `
     <main style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:28px;text-align:center;padding:32px;background:var(--bg)">
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-        <img src="./logo.png" alt="이루자 로고"
+        <img src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="이루자 로고"
           style="height:56px;width:auto;object-fit:contain" />
         <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:-0.5px">안전담당자 자격인증제</div>
       </div>
@@ -4240,7 +4257,7 @@ function buildHeader() {
   return `
     <header class="topbar">
       <div class="brand" aria-label="시스템 이름">
-        <img class="brand-logo" src="./logo.png" alt="에이치앤이루자 로고" />
+        <img class="brand-logo" src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="에이치앤이루자 로고" />
         <div>
           <h1>안전담당자 자격인증제</h1>
         </div>
@@ -4316,7 +4333,7 @@ function renderLogin() {
     <main class="login-wrap">
       <div class="login-card v2">
         <div class="login-card-banner">
-          <img class="login-banner-logo" src="./logo.png" alt="로고" />
+          <img class="login-banner-logo" src="https://hniruja.com/wp-content/uploads/2024/02/h-%EC%9D%B4%EB%A3%A8%EC%9E%90.png" alt="로고" />
           <h2 class="login-title">안전담당자 자격인증제</h2>
         </div>
         <div class="login-card-body">
@@ -5491,7 +5508,7 @@ function renderResultScreen() {
 }
 
 
-function launchConfetti(duration = 4000) {
+function launchConfetti(duration = 6000) {
   const existing = document.getElementById("confettiCanvas");
   if (existing) existing.remove();
 
@@ -7080,12 +7097,12 @@ function getAdminResultsSignature() {
     quarter: state.filters.resultQuarter || "전체",
     disqualified: state.filters.resultDisqualified || "전체",
     sort: state.filters.resultSort || "dateDesc",
-    pageSize: 50
+    pageSize: state.adminResultsPage.pageSize
   });
 }
 
 function getAdminLogsSignature() {
-  return JSON.stringify({ pageSize: 50 });
+  return JSON.stringify({ pageSize: state.adminLogsPage.pageSize });
 }
 
 function resetAdminResultsPage() {
@@ -7133,11 +7150,13 @@ function changeAdminLogsPage(delta) {
 }
 
 function renderAdminPager(pageState, type) {
+  const pageSizeOptions = [25, 50, 100].map((n) => optionHtml(String(n), String(pageState.pageSize), String(n))).join("");
   const total = Number(pageState.total || 0);
   const page = Number(pageState.page || 0);
-  const pageSize = 50;
+  const pageSize = Number(pageState.pageSize || 50);
   const maxPage = Math.max(0, Math.ceil(total / pageSize) - 1);
   const changeFn = type === "logs" ? "changeAdminLogsPage" : "changeAdminResultsPage";
+  const sizeFn = type === "logs" ? "setAdminLogsPageSize" : "setAdminResultsPageSize";
   const goFn = type === "logs" ? "goAdminLogsPage" : "goAdminResultsPage";
 
   const makePageButton = (p) => `
@@ -7172,6 +7191,436 @@ function renderAdminPager(pageState, type) {
           <button class="admin-page-btn" type="button" onclick="${goFn}(${maxPage})" ${page >= maxPage ? "disabled" : ""} aria-label="마지막 페이지">»</button>
         </div>
       </div>
+      <div class="admin-pager-right">
+        <select class="admin-page-size" onchange="${sizeFn}(this.value)" aria-label="페이지당 표시 개수">${pageSizeOptions}</select>
+      </div>
     </div>`;
 }
 
+function goAdminResultsPage(page) {
+  const maxPage = Math.max(0, Math.ceil((state.adminResultsPage.total || 0) / state.adminResultsPage.pageSize) - 1);
+  state.adminResultsPage.page = Math.min(maxPage, Math.max(0, Number(page) || 0));
+  state.adminResultsPage.loaded = false;
+  renderAdminDashboard();
+}
+
+function goAdminLogsPage(page) {
+  const maxPage = Math.max(0, Math.ceil((state.adminLogsPage.total || 0) / state.adminLogsPage.pageSize) - 1);
+  state.adminLogsPage.page = Math.min(maxPage, Math.max(0, Number(page) || 0));
+  state.adminLogsPage.loaded = false;
+  renderAdminDashboard();
+}
+
+function ensureAdminResultsPageLoaded() {
+  const signature = getAdminResultsSignature();
+  const pageState = state.adminResultsPage;
+  if (pageState.loading) return;
+  if (pageState.loaded && pageState.signature === signature) return;
+
+  pageState.loading = true;
+  pageState.error = "";
+  pageState.signature = signature;
+
+  _sbFetchResultsPage({ page: pageState.page, pageSize: pageState.pageSize })
+    .then(({ rows, total }) => {
+      pageState.rows = rows;
+      pageState.total = total;
+      pageState.loaded = true;
+      pageState.loading = false;
+      pageState.error = "";
+      if (state.view === "admin" && state.adminSection === "results") renderAdminDashboard();
+    })
+    .catch((error) => {
+      console.warn("결과 페이지 조회 실패", error);
+      pageState.rows = [];
+      pageState.total = 0;
+      pageState.loaded = true;
+      pageState.loading = false;
+      pageState.error = error.message || String(error);
+      if (state.view === "admin" && state.adminSection === "results") renderAdminDashboard();
+    });
+}
+
+function ensureAdminLogsPageLoaded() {
+  const signature = getAdminLogsSignature();
+  const pageState = state.adminLogsPage;
+  if (pageState.loading) return;
+  if (pageState.loaded && pageState.signature === signature) return;
+
+  pageState.loading = true;
+  pageState.error = "";
+  pageState.signature = signature;
+
+  _sbFetchLogsPage({ page: pageState.page, pageSize: pageState.pageSize })
+    .then(({ rows, total }) => {
+      pageState.rows = rows;
+      pageState.total = total;
+      pageState.loaded = true;
+      pageState.loading = false;
+      pageState.error = "";
+      if (state.view === "admin" && state.adminSection === "logs") renderAdminDashboard();
+    })
+    .catch((error) => {
+      console.warn("로그 페이지 조회 실패", error);
+      pageState.rows = [];
+      pageState.total = 0;
+      pageState.loaded = true;
+      pageState.loading = false;
+      pageState.error = error.message || String(error);
+      if (state.view === "admin" && state.adminSection === "logs") renderAdminDashboard();
+    });
+}
+
+function renderResultsManager() {
+  const quarters = [...new Set(examResults.map(r => r.quarter).filter(Boolean))].sort((a,b) => String(b).localeCompare(String(a), "ko"));
+  const pageState = state.adminResultsPage;
+  setTimeout(() => ensureAdminResultsPageLoaded(), 0);
+  const rows = pageState.rows || [];
+  const grouped = rows.reduce((acc, row) => {
+    const key = row.quarter || "분기 미지정";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(row);
+    return acc;
+  }, {});
+  const visibleQuarters = Object.keys(grouped).sort().reverse();
+
+  return `
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>결과 관리</h2>
+          
+        </div>
+        <button id="refreshBtn" class="btn" type="button" onclick="resetAdminResultsPage(); refreshFromRemote();">⟳ 새로고침</button>
+      </div>
+
+      <div class="filters">
+        <div class="field">
+          <label for="resultDepartment">소속</label>
+          <select id="resultDepartment" onchange="onAdminResultFilterChange('resultDepartment', this.value);">
+            ${optionHtml("전체", state.filters.resultDepartment)}
+            ${getDepartments().map(dep => optionHtml(dep, state.filters.resultDepartment)).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="resultQuarter">분기</label>
+          <select id="resultQuarter" onchange="onAdminResultFilterChange('resultQuarter', this.value);">
+            ${optionHtml("전체", state.filters.resultQuarter)}
+            ${quarters.map(q => optionHtml(q, state.filters.resultQuarter)).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="resultDisqualified">실격 여부</label>
+          <select id="resultDisqualified" onchange="onAdminResultFilterChange('resultDisqualified', this.value);">
+            ${["전체", "실격", "정상"].map(v => optionHtml(v, state.filters.resultDisqualified)).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="resultSort">정렬</label>
+          <select id="resultSort" onchange="onAdminResultFilterChange('resultSort', this.value);">
+            ${optionHtml("dateDesc",  state.filters.resultSort, "최신순")}
+            ${optionHtml("scoreDesc", state.filters.resultSort, "점수 높은 순")}
+            ${optionHtml("scoreAsc",  state.filters.resultSort, "점수 낮은 순")}
+          </select>
+        </div>
+        <button class="btn" type="button" onclick="resetResultFilters()">초기화</button>
+      </div>
+
+      ${pageState.loading && !pageState.loaded ? `<div class="admin-page-loading">결과를 불러오는 중입니다...</div>` : ""}
+      ${pageState.error ? `<div class="notice danger admin-page-error">결과 조회 실패: ${escapeHtml(pageState.error)}</div>` : ""}
+
+      ${visibleQuarters.map(quarter => `
+        <section class="quarter-result-block">
+          <div class="quarter-title">
+            <h3>${escapeHtml(quarter)}</h3>
+            <span class="badge">현재 페이지 ${grouped[quarter].length}건</span>
+          </div>
+          <div class="table-wrap">
+            <table class="admin-result-table">
+              <colgroup>
+                <col style="width:140px"><col style="width:140px"><col style="width:86px">
+                <col style="width:170px"><col style="width:116px"><col style="width:78px">
+                <col style="width:82px"><col style="width:96px"><col style="width:214px"><col style="width:84px">
+              </colgroup>
+              <thead>
+                <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>합불여부</th><th>자격 유효기간</th><th>탭 전환</th></tr>
+              </thead>
+              <tbody>
+                ${grouped[quarter].map(raw => {
+                  const r = getRegradedResult(raw);
+                  const validity = getCertificationValidity(r);
+                  return `
+                  <tr>
+                    <td>${r.startedAt ? formatDateTime(r.startedAt) : "-"}</td>
+                    <td>${formatDateTime(r.submittedAt)}</td>
+                    <td>${(r.startedAt && r.submittedAt) ? (() => { const mins = Math.round((new Date(r.submittedAt) - new Date(r.startedAt)) / 60000); return mins + "분"; })() : "-"}</td>
+                    <td class="fixed-dept">${escapeHtml(r.department)}</td>
+                    <td class="fixed-name">${escapeHtml(r.name)}</td>
+                    <td>${r.correctCount}/${r.totalCount}</td>
+                    <td class="fixed-score"><strong>${r.percentageScore}점</strong></td>
+                    <td class="fixed-pass">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
+                    <td>${validity ? `${formatDateOnly(validity.validFrom)} ~ ${formatDateOnly(validity.validUntil)}` : "-"}</td>
+                    <td>${r.tabSwitchCount ?? 0}회</td>
+                  </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `).join("") || (!pageState.loading ? `<div class="empty">조건에 맞는 결과가 없습니다.</div>` : "")}
+      ${renderAdminPager(pageState, "results")}
+    </section>
+  `;
+}
+
+function filterResults() {
+  let rows = examResults.filter(r => {
+    const depOk  = state.filters.resultDepartment === "전체" || r.department === state.filters.resultDepartment;
+    const qOk    = state.filters.resultQuarter    === "전체" || r.quarter    === state.filters.resultQuarter;
+    const disqOk = state.filters.resultDisqualified === "전체" ||
+      (state.filters.resultDisqualified === "실격" &&  r.disqualified) ||
+      (state.filters.resultDisqualified === "정상" && !r.disqualified);
+    return depOk && qOk && disqOk;
+  });
+
+  if      (state.filters.resultSort === "scoreDesc") rows.sort((a, b) => getRegradedResult(b).percentageScore - getRegradedResult(a).percentageScore);
+  else if (state.filters.resultSort === "scoreAsc")  rows.sort((a, b) => getRegradedResult(a).percentageScore - getRegradedResult(b).percentageScore);
+  else                                               rows.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+  return rows;
+}
+
+function resetResultFilters() {
+  state.filters.resultDepartment   = "전체";
+  state.filters.resultQuarter      = "전체";
+  state.filters.resultSort         = "dateDesc";
+  state.filters.resultDisqualified = "전체";
+  resetAdminResultsPage();
+  renderAdminDashboard();
+}
+
+
+/* ── js/adminStats.js ── */
+"use strict";
+
+// 책임: 통계 시각화 (점수 분포, 부서별 평균, 합격 비율, 카테고리 문항 수)
+
+function renderStatsManager() {
+  const currentResults = examResults.filter(r => r.quarter === getCurrentQuarter()).map(getRegradedResult);
+  const scoreDist      = getScoreDistribution(examResults);
+  const categoryCounts = getCategoryCounts().map(item => ({ label: item.category, value: item.count }));
+  const statusRatio    = [
+    { label: "합격",   value: examResults.map(getRegradedResult).filter(r =>  r.passed && !r.disqualified).length },
+    { label: "불합격", value: examResults.map(getRegradedResult).filter(r => !r.passed && !r.disqualified).length },
+    { label: "실격",   value: examResults.map(getRegradedResult).filter(r =>  r.disqualified).length }
+  ];
+  const deptAvg = getDepartments().map(dep => {
+    const rows = examResults.filter(r => r.department === dep).map(getRegradedResult);
+    const avg  = rows.length ? Math.round(rows.reduce((sum, r) => sum + r.percentageScore, 0) / rows.length) : 0;
+    return { label: dep, value: avg };
+  });
+
+  return `
+    <section class="section-head">
+      <div>
+        <h2>통계 시각화</h2>
+      </div>
+    </section>
+
+    <div class="grid two">
+      <section class="card">
+        <div class="section-head"><h3>점수 분포 바 차트</h3></div>
+        ${renderBarChart(scoreDist)}
+      </section>
+      <section class="card">
+        <div class="section-head"><h3>소속별 평균 점수</h3></div>
+        ${renderBarChart(deptAvg)}
+      </section>
+      <section class="card">
+        <div class="section-head"><h3>합격/불합격/실격 비율</h3></div>
+        ${renderBarChart(statusRatio)}
+      </section>
+      <section class="card">
+        <div class="section-head"><h3>카테고리별 문항 수</h3></div>
+        ${renderBarChart(categoryCounts)}
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <div class="section-head"><h3>이번 분기 요약</h3></div>
+      <div class="grid three">
+        <div class="metric"><div class="label">이번 분기 결과 수</div><div class="value">${currentResults.length}</div></div>
+        <div class="metric"><div class="label">최고 점수</div><div class="value">${currentResults.length ? Math.max(...currentResults.map(r => r.percentageScore)) : 0}</div></div>
+        <div class="metric"><div class="label">실격자</div><div class="value">${currentResults.filter(r => r.disqualified).length}</div></div>
+      </div>
+    </section>
+  `;
+}
+
+
+/* ── js/adminLogs.js ── */
+"use strict";
+
+// 책임: 응시 로그 목록 (최신순 정렬, 관리자 전용)
+
+function renderLogManager() {
+  const pageState = state.adminLogsPage;
+  setTimeout(() => ensureAdminLogsPageLoaded(), 0);
+  const logs = pageState.rows || [];
+  return `
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>응시 로그</h2>
+          
+        </div>
+        <button id="refreshBtn" class="btn" type="button" onclick="resetAdminLogsPage(); refreshFromRemote();">⟳ 새로고침</button>
+      </div>
+      ${pageState.loading && !pageState.loaded ? `<div class="admin-page-loading">로그를 불러오는 중입니다...</div>` : ""}
+      ${pageState.error ? `<div class="notice danger admin-page-error">로그 조회 실패: ${escapeHtml(pageState.error)}</div>` : ""}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>일시</th><th>소속</th><th>성명</th><th>유형</th><th>탭 전환 횟수</th><th>내용</th></tr>
+          </thead>
+          <tbody>
+            ${logs.length ? logs.map(log => `
+              <tr>
+                <td>${formatDateTime(log.createdAt)}</td>
+                <td>${escapeHtml(log.department || "-")}</td>
+                <td>${escapeHtml(log.name)}</td>
+                <td>
+                  <span class="badge ${
+                    String(log.type).includes("DISQUALIFIED") ? "danger" :
+                    String(log.type).includes("WARNING")      ? "warning" : "success"
+                  }">${escapeHtml(log.type)}</span>
+                </td>
+                <td>${log.tabSwitchCount ?? 0}</td>
+                <td>${escapeHtml(log.message)}</td>
+              </tr>
+            `).join("") : `<tr><td colspan="6" class="empty">표시할 로그가 없습니다.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      ${renderAdminPager(pageState, "logs")}
+    </section>
+  `;
+}
+
+</script>
+
+  <script>
+    // ── 앱 진입점 ──
+    function restoreExamFromActiveRecord(user) {
+      return restoreActiveExamRecord(getActiveExamRecord(user.employeeId));
+    }
+
+    function initApp() {
+      _initSampleData();
+
+      let savedSession = null;
+      try {
+        const saved = sessionStorage.getItem("HNIRUJA_SESSION");
+        if (saved) savedSession = JSON.parse(saved);
+      } catch(e) {}
+
+      // 새로고침 직후 탭전환 오감지 방지 플래그
+      window._appJustLoaded = true;
+      setTimeout(() => { window._appJustLoaded = false; }, 800);
+
+      state.view = "loading";
+      renderLoadingScreen("로그인 정보를 불러오는 중입니다", 30);
+
+      if (!(isAppsScriptRuntime() || isExternalApiRuntime())) {
+        state.loginError = "서버 연결을 사용할 수 없습니다. Supabase 연결 상태를 확인해 주세요.";
+        state.view = "login";
+        render();
+        return;
+      }
+
+      const finishLoginScreen = () => {
+        state.view = "login";
+        render();
+      };
+
+      loadInitialData(async (ok) => {
+        if (!ok) {
+          finishLoginScreen();
+          return;
+        }
+
+        if (!savedSession?.user || !savedSession?.view) {
+          finishLoginScreen();
+          return;
+        }
+
+        state.currentUser  = savedSession.user;
+        state.adminSection = savedSession.adminSection || "dashboard";
+        state.isTestMode   = false;
+
+        // 관리자는 관리자 데이터가 필요하므로 이때만 전체 데이터를 로드합니다.
+        if (savedSession.user.role === "admin" || savedSession.view === "admin") {
+          renderLoadingScreen("관리자 데이터를 불러오는 중입니다", 60);
+          loadRemoteData((adminOk) => {
+            if (!adminOk) {
+              state.currentUser = null;
+              finishLoginScreen();
+              return;
+            }
+            state.view = "admin";
+            render();
+          });
+          return;
+        }
+
+        try {
+          renderLoadingScreen("응시 정보를 확인하는 중입니다", 60);
+          await loadCandidateRuntimeData(savedSession.user);
+
+          const pendingRetry = await retryPendingSubmissions(savedSession.user.employeeId);
+          if (pendingRetry?.ok && pendingRetry.result) {
+            state.lastResult = pendingRetry.result;
+            state.view = "result";
+            render();
+            return;
+          }
+
+          let restored = false;
+          if (savedSession.view === "exam") {
+            restored = restoreExamFromActiveRecord(savedSession.user);
+            if (!restored) state.view = "candidate";
+          } else if (savedSession.view === "result") {
+            const empId = savedSession.user.employeeId;
+            const serverResult = examResults
+              .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
+              .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
+            if (serverResult) {
+              state.lastResult = serverResult;
+              state.view = "result";
+              restored = true;
+            } else {
+              state.lastResult = null;
+              state.view = "candidate";
+            }
+          } else {
+            state.view = savedSession.view === "candidate" ? "candidate" : "login";
+            restored = state.view !== "login";
+          }
+
+          if (!restored && state.view !== "candidate") state.view = "login";
+          render();
+          if (state.view === "exam" && state.currentExam) {
+            setTimeout(() => { startTimer(); }, 100);
+          }
+        } catch (e) {
+          console.error("세션 복원 실패", e);
+          state.currentUser = null;
+          state.loginError = "세션을 복원하지 못했습니다. 다시 로그인해 주세요.";
+          finishLoginScreen();
+        }
+      });
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
