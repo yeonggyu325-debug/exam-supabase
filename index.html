@@ -2011,6 +2011,7 @@ tbody tr:hover td { background: #f8fbff; }
   .admin-result-table td:nth-child(8)::before { content: "합불여부"; }
   .admin-result-table td:nth-child(9)::before { content: "유효기간"; }
   .admin-result-table td:nth-child(10)::before { content: "탭 전환"; }
+  .admin-result-table td:nth-child(11)::before { content: "문제세트"; }
   .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(1)::before { content: "일시/항목"; }
   .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(2)::before { content: "소속/분류"; }
   .admin-main .table-wrap table:not(.admin-result-table) td:nth-child(3)::before { content: "성명/내용"; }
@@ -2742,6 +2743,220 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
   }
 }
 
+
+
+/* ════════════════════════════════════════
+   Candidate UX Additions: network Wi‑Fi, question navigation, skeleton loading
+   ════════════════════════════════════════ */
+.network-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.86);
+  border: 1px solid rgba(148,163,184,.22);
+  box-shadow: 0 10px 26px rgba(56,104,255,.08);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  white-space: nowrap;
+}
+.network-status-pill .wifi-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  position: relative;
+}
+.network-status-pill svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.network-status-pill.is-online {
+  color: #18b957;
+  border-color: rgba(24,185,87,.20);
+  box-shadow: 0 10px 26px rgba(24,185,87,.10);
+}
+.network-status-pill.is-offline {
+  color: #ef3f61;
+  border-color: rgba(239,63,97,.26);
+  background: rgba(255,241,244,.96);
+  box-shadow: 0 10px 26px rgba(239,63,97,.13);
+}
+.network-status-pill .wifi-alert {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-1px);
+  color: #ef3f61;
+  font-size: 14px;
+  font-weight: 1000;
+  line-height: 1;
+  text-shadow: 0 1px 0 #fff;
+}
+.network-status-text { display: none; }
+.network-status-pill.is-offline .network-status-text { display: inline; color: #be123c; }
+
+.v2-exam-nav-wrap {
+  position: sticky;
+  top: calc(64px + 58px);
+  z-index: 42;
+  background: rgba(255,255,255,.54);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-bottom: 1px solid rgba(148,163,184,.16);
+  box-shadow: 0 12px 32px rgba(56,104,255,.06);
+}
+.v2-exam-nav-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 16px 10px;
+}
+.v2-exam-nav-scroll {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 1px 6px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.v2-exam-nav-scroll::-webkit-scrollbar { height: 4px; }
+.v2-exam-nav-scroll::-webkit-scrollbar-thumb { background: rgba(56,104,255,.22); border-radius: 999px; }
+.v2-qnav-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(255,255,255,.84);
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, color .18s ease, background .18s ease;
+  box-shadow: 0 8px 20px rgba(35,65,120,.04);
+  scroll-snap-align: center;
+}
+.v2-qnav-btn:hover {
+  transform: translateY(-1px);
+  color: #1e293b;
+  border-color: rgba(56,104,255,.32);
+  box-shadow: 0 14px 30px rgba(56,104,255,.13);
+}
+.v2-qnav-btn.answered {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #76a7ff 0%, #3868ff 100%);
+  box-shadow: 0 12px 28px rgba(56,104,255,.22);
+}
+.v2-qnav-btn.unanswered {
+  background: rgba(255,255,255,.88);
+  color: #94a3b8;
+}
+.v2-qnav-btn.current {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(56,104,255,.12), 0 16px 34px rgba(56,104,255,.20);
+  transform: translateY(-1px);
+}
+.v2-qnav-btn.current.unanswered {
+  color: #3868ff;
+  border-color: rgba(56,104,255,.42);
+}
+.v2-top-submit-btn {
+  min-height: 34px !important;
+  padding: 0 14px !important;
+  border-radius: 12px !important;
+  white-space: nowrap;
+}
+.v2-top-submit-btn:disabled {
+  background: rgba(241,245,249,.76) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(226,232,240,.95) !important;
+  box-shadow: none !important;
+}
+.question-block,
+.v2-question-card { scroll-margin-top: 165px; }
+
+.skeleton-wrap {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+}
+.skeleton-card,
+.skeleton-line,
+.skeleton-pill {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(226,232,240,.50) 0%, rgba(248,251,255,.96) 42%, rgba(226,232,240,.50) 76%);
+  background-size: 220% 100%;
+  animation: skeletonShimmer 1.15s ease-in-out infinite;
+  border-radius: 14px;
+}
+.skeleton-card {
+  min-height: 58px;
+  border: 1px solid rgba(148,163,184,.15);
+  box-shadow: 0 12px 28px rgba(56,104,255,.05);
+}
+.skeleton-line { height: 14px; }
+.skeleton-pill { height: 30px; width: 92px; border-radius: 999px; }
+.skeleton-table {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+.skeleton-row {
+  display: grid;
+  grid-template-columns: 1.2fr .9fr .7fr 1.4fr .8fr;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid rgba(148,163,184,.15);
+  border-radius: 16px;
+  background: rgba(255,255,255,.68);
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+@media (max-width: 820px) {
+  .network-status-pill { min-width: 34px; padding: 0 7px; }
+  .network-status-pill .network-status-text { display: none !important; }
+  .v2-exam-bar-right { gap: 7px !important; }
+  .v2-top-submit-btn { padding: 0 11px !important; min-width: 58px !important; }
+  .v2-exam-nav-wrap { top: calc(51px + 56px); }
+  .v2-exam-nav-inner { padding: 7px 10px 8px; }
+  .v2-qnav-btn { width: 32px; height: 32px; min-height: 32px; border-radius: 13px; font-size: 12px; }
+  .question-block,
+  .v2-question-card { scroll-margin-top: 152px; }
+  .skeleton-row { grid-template-columns: 1fr; gap: 8px; }
+}
+
+
+
+/* === Question accuracy / submission detail UI === */
+.qb-stat-cell { text-align:center; min-width:96px; }
+.qb-stat-pill { display:inline-flex; align-items:center; justify-content:center; min-width:68px; height:26px; border-radius:999px; padding:0 9px; font-size:12px; font-weight:900; letter-spacing:-.01em; border:1px solid rgba(148,163,184,.24); background:#f8fafc; color:#475569; }
+.qb-stat-pill.good { background:#ecfdf5; color:#15803d; border-color:#bbf7d0; }
+.qb-stat-pill.mid { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.qb-stat-pill.low { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+.qb-stat-pill.empty { background:#f8fafc; color:#94a3b8; }
+.qb-stat-meta { margin-top:4px; font-size:10.5px; font-weight:800; color:#94a3b8; white-space:nowrap; }
+.result-detail-btn { display:inline-flex; align-items:center; justify-content:center; min-height:28px; padding:0 10px; border-radius:999px; border:1px solid rgba(56,104,255,.18); background:#fff; color:#3868ff; font-size:12px; font-weight:900; box-shadow:0 8px 20px rgba(56,104,255,.08); cursor:pointer; transition:.18s ease; }
+.result-detail-btn:hover { box-shadow:0 10px 26px rgba(56,104,255,.16); transform:translateY(-1px); }
+
 </style>
 </head>
 <body>
@@ -3278,6 +3493,187 @@ function _mapActiveExamRow(a, questionRows = []) {
   return { key: a.key, ...(snap || {}) };
 }
 
+
+function buildQuestionStatsFromRows(rows = []) {
+  const map = {};
+  (rows || []).forEach((row) => {
+    const qid = row.question_id ?? row.questionId;
+    if (qid === null || qid === undefined || qid === "") return;
+    const key = String(qid);
+    if (!map[key]) {
+      map[key] = { questionId: key, attempts: 0, correct: 0, wrong: 0, unanswered: 0, lastUsedAt: "", quarters: new Set() };
+    }
+    const stat = map[key];
+    stat.attempts += 1;
+    if (row.unanswered) stat.unanswered += 1;
+    if (row.is_correct === true || row.correct === true) stat.correct += 1;
+    else stat.wrong += 1;
+    const at = row.submitted_at || row.createdAt || row.submittedAt || "";
+    if (at && (!stat.lastUsedAt || new Date(at) > new Date(stat.lastUsedAt))) stat.lastUsedAt = at;
+    const q = row.quarter || "";
+    if (q) stat.quarters.add(q);
+  });
+  Object.values(map).forEach((stat) => {
+    stat.accuracy = stat.attempts > 0 ? Math.round((stat.correct / stat.attempts) * 100) : null;
+    stat.quarterCount = stat.quarters.size;
+    delete stat.quarters;
+  });
+  return map;
+}
+
+function buildQuestionStatsFromActivityLogs() {
+  const rows = [];
+  (activityLogs || []).forEach((log) => {
+    if (!Array.isArray(log.answerReview)) return;
+    log.answerReview.forEach((item) => rows.push({
+      question_id: item.questionId,
+      is_correct: !!item.correct,
+      unanswered: !!item.unanswered,
+      quarter: log.quarter || "",
+      submitted_at: log.createdAt || ""
+    }));
+  });
+  return buildQuestionStatsFromRows(rows);
+}
+
+async function _sbFetchQuestionStats() {
+  if (!_sb) return buildQuestionStatsFromActivityLogs();
+  try {
+    const { data, error } = await _sb
+      .from("exam_submission_answers")
+      .select("question_id,is_correct,unanswered,quarter,submitted_at")
+      .limit(20000);
+    if (error) throw error;
+    return buildQuestionStatsFromRows(data || []);
+  } catch (err) {
+    console.warn("문항별 정답률 테이블 조회 실패, activity_logs 기반으로 대체합니다.", err);
+    return buildQuestionStatsFromActivityLogs();
+  }
+}
+
+function ensureQuestionStatsLoaded(force = false) {
+  if (questionStatsLoading) return;
+  if (questionStatsLoaded && !force) return;
+  questionStatsLoading = true;
+  _sbFetchQuestionStats()
+    .then((stats) => {
+      questionStats = stats || {};
+      questionStatsLoaded = true;
+      questionStatsLoading = false;
+      if (state.view === "admin" && state.adminSection === "questions") renderAdminDashboard();
+    })
+    .catch((err) => {
+      console.warn("문항 통계 조회 실패", err);
+      questionStats = buildQuestionStatsFromActivityLogs();
+      questionStatsLoaded = true;
+      questionStatsLoading = false;
+      if (state.view === "admin" && state.adminSection === "questions") renderAdminDashboard();
+    });
+}
+
+function getQuestionStats(questionId) {
+  if (questionId === null || questionId === undefined) return null;
+  return questionStats[String(questionId)] || null;
+}
+
+function renderQuestionAccuracyCell(questionId) {
+  const stat = getQuestionStats(questionId);
+  if (!questionStatsLoaded && questionStatsLoading) {
+    return `<div class="qb-stat-cell"><span class="qb-stat-pill empty">계산중</span><div class="qb-stat-meta">통계 로드</div></div>`;
+  }
+  if (!stat || !stat.attempts) {
+    return `<div class="qb-stat-cell"><span class="qb-stat-pill empty">-</span><div class="qb-stat-meta">출제 0회</div></div>`;
+  }
+  const cls = stat.attempts < 10 ? "empty" : (stat.accuracy >= 80 ? "good" : (stat.accuracy >= 40 ? "mid" : "low"));
+  const hint = stat.attempts < 10 ? "표본부족" : (stat.accuracy >= 80 ? "쉬움" : (stat.accuracy >= 40 ? "보통" : "검토"));
+  return `<div class="qb-stat-cell" title="출제 ${stat.attempts}회, 정답 ${stat.correct}회, 오답/미응답 ${stat.wrong}회"><span class="qb-stat-pill ${cls}">${stat.accuracy}%</span><div class="qb-stat-meta">${hint} · ${stat.attempts}회</div></div>`;
+}
+
+function buildSubmissionAnswerRows(result, log) {
+  const review = Array.isArray(log?.answerReview) ? log.answerReview : [];
+  const submittedAt = result?.submittedAt || log?.createdAt || new Date().toISOString();
+  return review.map((item, idx) => ({
+    result_id: result.resultId,
+    employee_id: result.employeeId,
+    department: result.department || log?.department || "",
+    name: result.name || log?.name || "",
+    quarter: result.quarter || log?.quarter || "",
+    question_id: item.questionId == null ? null : String(item.questionId),
+    category: item.category || "",
+    display_order: Number(item.no || idx + 1),
+    question_text_snapshot: item.text || "",
+    options_snapshot: Array.isArray(item.options) ? item.options : [],
+    option_original_indexes: Array.isArray(item.optionOriginalIndexes) ? item.optionOriginalIndexes : [],
+    selected_display_index: Number.isInteger(item.selectedDisplayIndex) ? item.selectedDisplayIndex : null,
+    selected_original_option: item.selectedOriginalOption == null ? null : Number(item.selectedOriginalOption),
+    selected_text: item.selectedText || "",
+    correct_display_index: Number.isInteger(item.correctDisplayIndex) ? item.correctDisplayIndex : null,
+    correct_original_option: item.correctOriginalOption == null ? null : Number(item.correctOriginalOption),
+    correct_text: item.correctText || "",
+    is_correct: !!item.correct,
+    unanswered: !!item.unanswered,
+    submitted_at: submittedAt
+  })).filter((row) => row.result_id && row.employee_id && row.quarter && row.question_id !== null);
+}
+
+async function _sbUpsertSubmissionAnswers(result, log) {
+  const rows = buildSubmissionAnswerRows(result, log);
+  if (!_sb || !rows.length) return { ok: true, inserted: 0 };
+  try {
+    const { error } = await _sb
+      .from("exam_submission_answers")
+      .upsert(rows, { onConflict: "result_id,question_id,display_order" });
+    if (error) throw error;
+    questionStatsLoaded = false;
+    return { ok: true, inserted: rows.length };
+  } catch (err) {
+    console.warn("제출 상세 답안 저장 실패: exam_submission_answers 테이블/RLS/제약을 확인하세요.", err);
+    return { ok: false, inserted: 0, message: err.message || String(err) };
+  }
+}
+
+async function fetchSubmissionAnswersFromDb(employeeId, result) {
+  if (!_sb || !employeeId || !result) return null;
+  try {
+    let query = _sb
+      .from("exam_submission_answers")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .eq("quarter", result.quarter)
+      .order("display_order", { ascending: true });
+    if (result.resultId) query = query.eq("result_id", result.resultId);
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || !data.length) return null;
+    return {
+      logId: "answer-table-" + (result.resultId || employeeId),
+      employeeId,
+      type: "SUBMISSION_ANSWERS",
+      quarter: result.quarter,
+      createdAt: result.submittedAt,
+      answerReview: data.map((row) => ({
+        no: row.display_order,
+        questionId: row.question_id,
+        category: row.category || "",
+        text: row.question_text_snapshot || "",
+        options: Array.isArray(row.options_snapshot) ? row.options_snapshot : [],
+        optionOriginalIndexes: Array.isArray(row.option_original_indexes) ? row.option_original_indexes : [],
+        selectedDisplayIndex: row.selected_display_index,
+        selectedOriginalOption: row.selected_original_option,
+        selectedText: row.selected_text || "",
+        correctDisplayIndex: row.correct_display_index,
+        correctOriginalOption: row.correct_original_option,
+        correctText: row.correct_text || "",
+        correct: !!row.is_correct,
+        unanswered: !!row.unanswered
+      }))
+    };
+  } catch (err) {
+    console.warn("제출 상세 답안 테이블 조회 실패", err);
+    return null;
+  }
+}
+
 async function _sbGetAppData() {
   if (!_sb) throw new Error("Supabase 클라이언트를 불러오지 못했습니다. CDN 또는 네트워크 연결을 확인하세요.");
 
@@ -3618,6 +4014,10 @@ async function _sbAppendExamSubmission(result, log) {
       if (logError) throw logError;
     }
 
+    if (log && Array.isArray(log.answerReview) && log.answerReview.length) {
+      await _sbUpsertSubmissionAnswers(result, log);
+    }
+
     const key = result.employeeId + "__" + result.quarter;
     const { error: activeDeleteError } = await _sb.from("active_exams").delete().eq("key", key);
     if (activeDeleteError) throw activeDeleteError;
@@ -3637,6 +4037,13 @@ async function _sbResetCandidateData(employeeId) {
 
     const { error: logsError } = await _sb.from("activity_logs").delete().eq("employee_id", employeeId);
     if (logsError) throw logsError;
+
+    try {
+      const { error: answersError } = await _sb.from("exam_submission_answers").delete().eq("employee_id", employeeId);
+      if (answersError) console.warn("exam_submission_answers 삭제 실패", answersError);
+    } catch (e) {
+      console.warn("exam_submission_answers 테이블 없음 또는 권한 제한", e);
+    }
 
     const { error: activeError } = await _sb.from("active_exams").delete().like("key", employeeId + "__%");
     if (activeError) throw activeError;
@@ -4110,6 +4517,9 @@ let examSettings = {
 let examResults = [];
 let activityLogs = [];
 let activeExams = [];
+let questionStats = {};
+let questionStatsLoaded = false;
+let questionStatsLoading = false;
 
 function _initSampleData() {
   // 운영 버전: 샘플 데이터 주입 없음
@@ -4131,6 +4541,7 @@ const state = {
   loginError: "",
   examSaveError: "",
   examSyncState: "idle",
+  networkOnline: typeof navigator === "undefined" ? true : navigator.onLine,
   currentExam: null,
   currentQuestionIndex: 0,
   timerId: null,
@@ -4206,6 +4617,7 @@ function render() {
   if (state.view === "exam")      renderExamScreen();
   if (state.view === "result")    renderResultScreen();
   if (state.view === "admin")     renderAdminDashboard();
+  setTimeout(refreshNetworkStatus, 0);
 }
 
 function renderLoadingScreen(label, percent) {
@@ -4228,6 +4640,11 @@ function renderLoadingScreen(label, percent) {
         </div>
         <p id="loadingPct" style="color:var(--primary);font-size:14px;font-weight:700;margin:0">${pct}%</p>
         ` : `<p style="color:var(--muted);font-size:13px;margin:0">잠시만 기다려 주시길 바랍니다...</p>`}
+        <div class="skeleton-wrap" style="margin-top:18px;text-align:left">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-line" style="width:86%"></div>
+          <div class="skeleton-line" style="width:62%"></div>
+        </div>
       </div>
     </main>`;
 }
@@ -4317,6 +4734,55 @@ async function _submitAdminPassword(event) {
   }
 }
 
+
+function getNetworkOnline() {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function renderNetworkStatus() {
+  const online = state.networkOnline !== false;
+  const label = online ? "온라인" : "통신 끊김";
+  return `
+    <span id="networkStatus" class="network-status-pill ${online ? "is-online" : "is-offline"}" title="${label}" aria-label="네트워크 상태: ${label}">
+      <span class="wifi-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 14.5C10.9 8.6 21.1 8.6 27 14.5" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M10.4 20C13.5 17.1 18.5 17.1 21.6 20" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M15.1 25.4C15.6 24.9 16.4 24.9 16.9 25.4" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+        ${online ? "" : `<span class="wifi-alert">!</span>`}
+      </span>
+      <span class="network-status-text">${online ? "" : "통신 끊김"}</span>
+    </span>`;
+}
+
+function refreshNetworkStatus() {
+  state.networkOnline = getNetworkOnline();
+  const el = document.getElementById("networkStatus");
+  if (el) {
+    const online = state.networkOnline !== false;
+    el.className = `network-status-pill ${online ? "is-online" : "is-offline"}`;
+    el.title = online ? "온라인" : "통신 끊김";
+    el.setAttribute("aria-label", `네트워크 상태: ${online ? "온라인" : "통신 끊김"}`);
+    el.innerHTML = `
+      <span class="wifi-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 14.5C10.9 8.6 21.1 8.6 27 14.5" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M10.4 20C13.5 17.1 18.5 17.1 21.6 20" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M15.1 25.4C15.6 24.9 16.4 24.9 16.9 25.4" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+        ${online ? "" : `<span class="wifi-alert">!</span>`}
+      </span>
+      <span class="network-status-text">${online ? "" : "통신 끊김"}</span>`;
+  }
+}
+
+function initNetworkStatusListeners() {
+  state.networkOnline = getNetworkOnline();
+  window.addEventListener("online", () => { state.networkOnline = true; refreshNetworkStatus(); });
+  window.addEventListener("offline", () => { state.networkOnline = false; refreshNetworkStatus(); });
+}
+
 function buildHeader() {
   const isAdmin = state.currentUser?.role === "admin";
   if (!state.currentUser) return "";
@@ -4330,6 +4796,7 @@ function buildHeader() {
       </div>
       <div class="top-actions">
         ${isAdmin ? `<span class="badge admin">관리자 모드</span>` : ""}
+        ${renderNetworkStatus()}
         <button class="btn small" type="button" onclick="logout()">로그아웃</button>
       </div>
     </header>
@@ -5116,6 +5583,12 @@ function renderExamScreen() {
     </section>`;
   }).join("");
 
+  const questionNavHtml = exam.questions.map((question, index) => {
+    const answered = exam.answers[index] !== null;
+    const current = index === Number(state.currentQuestionIndex || exam.currentQuestionIndex || 0);
+    return `<button type="button" id="qnav${index}" class="v2-qnav-btn ${answered ? "answered" : "unanswered"} ${current ? "current" : ""}" onclick="scrollToExamQuestion(${index})" aria-label="${index + 1}번 문항으로 이동">${index + 1}</button>`;
+  }).join("");
+
   app.innerHTML = `
     ${buildHeader()}
     <div class="v2-exam-bar" id="examStickyBar">
@@ -5129,6 +5602,9 @@ function renderExamScreen() {
         <div class="v2-exam-bar-right">
           <span id="examSyncStatus" class="v2-sync-status v2-sync-${state.examSyncState === "error" ? "error" : state.examSyncState === "saving" ? "saving" : "ok"}" style="${state.examSyncState === "idle" ? "display:none" : "display:inline-flex"}" aria-label="답안 저장 상태">${state.examSyncState === "error" ? "네트워크 불안정" : ""}</span>
           <span class="v2-exam-progress-text">${answeredCount}/${exam.questions.length}</span>
+          <button class="btn primary v2-top-submit-btn" id="topSubmitBtn" type="button"
+            ${unanswered > 0 ? 'disabled' : 'onclick="openSubmitConfirm()"'}
+            aria-label="시험 제출">제출</button>
 
         </div>
       </div>
@@ -5136,6 +5612,11 @@ function renderExamScreen() {
         <div class="v2-exam-progress-fill" style="width:${progressPercent}%"></div>
       </div>
     </div>
+    <nav class="v2-exam-nav-wrap" aria-label="시험 문항 번호 이동">
+      <div class="v2-exam-nav-inner">
+        <div class="v2-exam-nav-scroll" id="examQuestionNav">${questionNavHtml}</div>
+      </div>
+    </nav>
 
     <main class="container v2-exam-container">
       ${state.examSaveError ? `<div class="notice danger" style="margin-bottom:12px">네트워크 불안정<br>답안 임시 저장에 실패했습니다. 연결 상태를 확인해 주세요. 최종 제출은 서버 저장 완료 전까지 결과 화면으로 이동하지 않습니다.</div>` : ""}
@@ -5158,23 +5639,27 @@ function updateSubmitButtonState() {
   const answered    = state.currentExam.answers.filter(a => a !== null).length;
   const unanswered  = total - answered;
   const finalBtn    = document.getElementById('bottomSubmitBtn');
-  if (finalBtn) {
+  const topBtn      = document.getElementById('topSubmitBtn');
+  [finalBtn, topBtn].filter(Boolean).forEach((btn) => {
     if (unanswered > 0) {
-      finalBtn.disabled = true;
-      finalBtn.textContent = `미응답 ${unanswered}문항 남음`;
-      finalBtn.style.cssText = 'background:#f1f5f9;color:#94a3b8;border:1.5px solid #e2e8f0;cursor:not-allowed;font-weight:700';
-      finalBtn.onclick = null;
-      finalBtn.classList.remove('primary');
+      btn.disabled = true;
+      btn.textContent = btn.id === 'topSubmitBtn' ? '제출' : `미응답 ${unanswered}문항 남음`;
+      if (btn.id === 'bottomSubmitBtn') btn.style.cssText = 'background:#f1f5f9;color:#94a3b8;border:1.5px solid #e2e8f0;cursor:not-allowed;font-weight:700';
+      btn.onclick = null;
+      btn.classList.remove('primary');
     } else {
-      finalBtn.disabled = false;
-      finalBtn.textContent = '✓ 최종 제출';
-      finalBtn.style.cssText = 'animation:pulseGlow 1.4s ease-in-out infinite';
-      finalBtn.onclick = openSubmitConfirm;
-      finalBtn.classList.add('primary');
+      btn.disabled = false;
+      btn.textContent = btn.id === 'topSubmitBtn' ? '제출' : '✓ 최종 제출';
+      if (btn.id === 'bottomSubmitBtn') btn.style.cssText = 'animation:pulseGlow 1.4s ease-in-out infinite';
+      btn.onclick = openSubmitConfirm;
+      btn.classList.add('primary');
     }
-  }
+  });
   const statEl = document.querySelector('.v2-exam-progress-text');
   if (statEl) statEl.textContent = answered + '/' + total;
+  const fill = document.querySelector('.v2-exam-progress-fill');
+  if (fill) fill.style.width = Math.round((answered / total) * 100) + '%';
+  refreshQuestionNav();
 }
 function selectAnswerLock(questionIndex, optionIndex) {
   if (!state.currentExam) return;
@@ -5240,6 +5725,45 @@ function selectAnswerAll(questionIndex, optionIndex) {
       finalBtn.classList.add('primary');
     }
   }
+  updateSubmitButtonState();
+}
+
+
+function scrollToExamQuestion(index) {
+  if (!state.currentExam) return;
+  state.currentQuestionIndex = index;
+  state.currentExam.currentQuestionIndex = index;
+  const target = document.getElementById(`q${index}`);
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  refreshQuestionNav(index);
+}
+
+function refreshQuestionNav(currentIndex = state.currentQuestionIndex) {
+  if (!state.currentExam) return;
+  const exam = state.currentExam;
+  exam.questions.forEach((_, index) => {
+    const btn = document.getElementById(`qnav${index}`);
+    if (!btn) return;
+    const answered = exam.answers[index] !== null;
+    btn.classList.toggle("answered", answered);
+    btn.classList.toggle("unanswered", !answered);
+    btn.classList.toggle("current", index === Number(currentIndex || 0));
+  });
+}
+
+function renderAdminSkeleton(kind = "results") {
+  const rows = Array.from({ length: kind === "logs" ? 6 : 5 });
+  return `
+    <div class="skeleton-table" aria-label="데이터를 불러오는 중입니다">
+      ${rows.map(() => `
+        <div class="skeleton-row">
+          <span class="skeleton-line" style="width:88%"></span>
+          <span class="skeleton-line" style="width:74%"></span>
+          <span class="skeleton-pill"></span>
+          <span class="skeleton-line" style="width:92%"></span>
+          <span class="skeleton-line" style="width:54%"></span>
+        </div>`).join("")}
+    </div>`;
 }
 
 /* ─── 제출 확인 모달 ─────────────────────────── */
@@ -5754,7 +6278,7 @@ function refreshQuestionTable() {
   if (!tbody) { renderAdminDashboard(); return; }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty">조건에 맞는 문제가 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">조건에 맞는 문제가 없습니다.</td></tr>`;
   } else {
     tbody.innerHTML = filtered.map((q, i) => `
       <tr style="${!q.active ? "opacity:0.55;background:#f8fafc" : ""}">
@@ -6183,10 +6707,15 @@ function getRegradedResult(result) {
   };
 }
 
-async function openSubmittedAnswerModal(encodedEmployeeId) {
+async function openSubmittedAnswerModal(encodedEmployeeId, encodedQuarter = "", encodedResultId = "") {
   const employeeId = decodeURIComponent(encodedEmployeeId || "");
+  const quarter = decodeURIComponent(encodedQuarter || "");
+  const resultId = decodeURIComponent(encodedResultId || "");
   const user = users.find(u => u.employeeId === employeeId) || {};
-  const latest = getLatestResult(employeeId);
+  const allRows = [...(examResults || []), ...(state.adminResultsPage?.rows || [])];
+  const latest = allRows.find(r => resultId && String(r.resultId) === String(resultId))
+    || allRows.find(r => r.employeeId === employeeId && quarter && r.quarter === quarter)
+    || getLatestResult(employeeId);
   if (!latest) {
     alert("제출 완료된 응시자만 문제세트와 선택 답안을 확인할 수 있습니다.");
     return;
@@ -6204,7 +6733,8 @@ async function openSubmittedAnswerModal(encodedEmployeeId) {
       </section>
     </div>`;
 
-  let log = getSubmissionAnswerLog(employeeId, latest);
+  let log = await fetchSubmissionAnswersFromDb(employeeId, latest);
+  if (!log) log = getSubmissionAnswerLog(employeeId, latest);
   if (!log) log = await fetchSubmissionAnswerLogFromDb(employeeId, latest);
   const answerReview = normalizeAnswerReviewFromQuestionBank(log);
 
@@ -6823,6 +7353,7 @@ function removeAffiliation(name, type = "") {
 // 책임: 문제은행 목록, 추가/수정/비활성화 모달
 
 function renderQuestionManager() {
+  setTimeout(() => ensureQuestionStatsLoaded(), 0);
   // 필터 상태
   const fCat    = state.filters.qbCategory    || "전체";
   const fStatus = state.filters.qbStatus      || "전체";
@@ -6847,7 +7378,7 @@ function renderQuestionManager() {
         <div>
           <h2>문제은행 관리</h2>
           <p style="font-size:13px;color:var(--muted);margin:2px 0 0">
-            전체 ${questionBank.length}문항 · 활성 ${activeCount} · 비활성 ${inactiveCount}
+            전체 ${questionBank.length}문항 · 활성 ${activeCount} · 비활성 ${inactiveCount} · 정답률 ${questionStatsLoaded ? "계산완료" : "계산중"}
           </p>
         </div>
         <div style="display:flex;gap:8px">
@@ -6890,6 +7421,7 @@ function renderQuestionManager() {
             <col style="width:110px">
             <col style="width:auto">
             <col style="width:62px">
+            <col style="width:98px">
             <col style="width:62px">
             <col style="width:130px">
           </colgroup>
@@ -6899,6 +7431,7 @@ function renderQuestionManager() {
               <th>카테고리</th>
               <th>문제</th>
               <th style="text-align:center">정답</th>
+              <th style="text-align:center">정답률</th>
               <th style="text-align:center">상태</th>
               <th style="text-align:center">관리</th>
             </tr>
@@ -6929,6 +7462,7 @@ function renderQuestionManager() {
                   </div>
                 </td>
                 <td style="text-align:center;font-weight:700;color:#059669">${Number(q.answerIndex)+1}번</td>
+                <td style="text-align:center">${renderQuestionAccuracyCell(q.id)}</td>
                 <td style="text-align:center">
                   <span class="badge ${q.active?"success":"danger"}">${q.active?"활성":"비활성"}</span>
                 </td>
@@ -7391,7 +7925,7 @@ function renderResultsManager() {
         <button class="btn" type="button" onclick="resetResultFilters()">초기화</button>
       </div>
 
-      ${pageState.loading && !pageState.loaded ? `<div class="admin-page-loading">결과를 불러오는 중입니다...</div>` : ""}
+      ${pageState.loading && !pageState.loaded ? renderAdminSkeleton("results") : ""}
       ${pageState.error ? `<div class="notice danger admin-page-error">결과 조회 실패: ${escapeHtml(pageState.error)}</div>` : ""}
 
       ${visibleQuarters.map(quarter => `
@@ -7405,10 +7939,10 @@ function renderResultsManager() {
               <colgroup>
                 <col style="width:140px"><col style="width:140px"><col style="width:86px">
                 <col style="width:170px"><col style="width:116px"><col style="width:78px">
-                <col style="width:82px"><col style="width:96px"><col style="width:214px"><col style="width:84px">
+                <col style="width:82px"><col style="width:96px"><col style="width:214px"><col style="width:84px"><col style="width:96px">
               </colgroup>
               <thead>
-                <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>합불여부</th><th>자격 유효기간</th><th>탭 전환</th></tr>
+                <tr><th>응시일시</th><th>제출일시</th><th>소요시간</th><th>소속</th><th>성명</th><th>정답</th><th>점수</th><th>합불여부</th><th>자격 유효기간</th><th>탭 전환</th><th>상세</th></tr>
               </thead>
               <tbody>
                 ${grouped[quarter].map(raw => {
@@ -7426,6 +7960,7 @@ function renderResultsManager() {
                     <td class="fixed-pass">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
                     <td>${validity ? `${formatDateOnly(validity.validFrom)} ~ ${formatDateOnly(validity.validUntil)}` : "-"}</td>
                     <td>${r.tabSwitchCount ?? 0}회</td>
+                    <td><button class="result-detail-btn" type="button" onclick="openSubmittedAnswerModal('${encodeURIComponent(r.employeeId)}','${encodeURIComponent(r.quarter || "")}','${encodeURIComponent(r.resultId || "")}')">보기</button></td>
                   </tr>`;
                 }).join("")}
               </tbody>
@@ -7540,7 +8075,7 @@ function renderLogManager() {
         </div>
         <button id="refreshBtn" class="btn" type="button" onclick="resetAdminLogsPage(); refreshFromRemote();">⟳ 새로고침</button>
       </div>
-      ${pageState.loading && !pageState.loaded ? `<div class="admin-page-loading">로그를 불러오는 중입니다...</div>` : ""}
+      ${pageState.loading && !pageState.loaded ? renderAdminSkeleton("logs") : ""}
       ${pageState.error ? `<div class="notice danger admin-page-error">로그 조회 실패: ${escapeHtml(pageState.error)}</div>` : ""}
       <div class="table-wrap">
         <table>
@@ -7685,6 +8220,7 @@ function renderLogManager() {
       });
     }
 
+    initNetworkStatusListeners();
     initApp();
   </script>
 </body>
