@@ -3029,6 +3029,240 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
   .pass-chat-cta { display: none; }
 }
 
+
+
+/* ── 관리자 표 Excel-style 헤더 정렬 + 값 필터 ── */
+.admin-main table thead th.excel-filter-th {
+  position: relative;
+  padding-right: 34px !important;
+  user-select: none;
+}
+.excel-filter-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none !important;
+}
+.excel-filter-btn:hover,
+.excel-filter-btn:focus-visible {
+  background: #eef4ff;
+  border-color: rgba(56,104,255,.26);
+  color: var(--primary);
+}
+.excel-filter-th.excel-sort-active,
+.excel-filter-th.excel-filter-active {
+  background: #eef4ff !important;
+  color: var(--primary-dark) !important;
+}
+.excel-filter-th.excel-sort-active .excel-filter-btn,
+.excel-filter-th.excel-filter-active .excel-filter-btn {
+  background: #fff;
+  border-color: rgba(56,104,255,.30);
+  color: var(--primary-dark);
+}
+.excel-filter-th.excel-filter-active .excel-filter-btn {
+  box-shadow: inset 0 0 0 1px rgba(56,104,255,.08) !important;
+}
+.excel-sort-menu {
+  position: fixed;
+  z-index: 12000;
+  width: min(340px, calc(100vw - 16px));
+  padding: 7px;
+  border: 1px solid rgba(148,163,184,.28);
+  border-radius: 14px;
+  background: rgba(255,255,255,.99);
+  box-shadow: 0 18px 55px rgba(15,23,42,.18);
+  backdrop-filter: blur(12px);
+}
+.excel-sort-menu-title {
+  padding: 7px 9px 6px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.excel-sort-menu button {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #1e293b;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.excel-sort-menu button:hover,
+.excel-sort-menu button:focus-visible { background: #eef4ff; color: var(--primary-dark); }
+.excel-sort-divider { height: 1px; background: #e2e8f0; margin: 6px 2px; }
+.excel-filter-search {
+  width: 100%;
+  min-height: 34px;
+  margin: 2px 0 6px;
+  padding: 7px 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 12px;
+  outline: none;
+}
+.excel-filter-search:focus { border-color: rgba(56,104,255,.55); box-shadow: 0 0 0 3px rgba(56,104,255,.08); }
+.excel-filter-select-all,
+.excel-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 8px;
+  margin: 0;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.excel-filter-select-all:hover,
+.excel-filter-option:hover { background: #f8fafc; }
+.excel-filter-select-all,
+.excel-filter-option {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.excel-filter-option input[type="checkbox"],
+.excel-filter-select-all input[type="checkbox"],
+.excel-filter-option span,
+.excel-filter-select-all span { cursor: pointer; }
+.excel-filter-select-all { font-weight: 900; border-bottom: 1px solid #eef2f7; margin-bottom: 3px; }
+/* 전역 input{width:100%; min-height:42px} 규칙이 체크박스를 키우지 못하도록 강제 고정 */
+.excel-filter-option input[type="checkbox"],
+.excel-filter-select-all input[type="checkbox"] {
+  appearance: auto !important;
+  -webkit-appearance: checkbox !important;
+  width: 15px !important;
+  height: 15px !important;
+  min-width: 15px !important;
+  min-height: 15px !important;
+  max-width: 15px !important;
+  max-height: 15px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  background: initial !important;
+  accent-color: var(--primary);
+  flex: 0 0 15px !important;
+}
+.excel-filter-option span,
+.excel-filter-select-all span {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.excel-filter-options {
+  max-height: min(300px, 44vh);
+  overflow: auto;
+  border: 1px solid #eef2f7;
+  border-radius: 9px;
+  background: #fff;
+  padding: 3px;
+}
+.excel-filter-empty { padding: 14px 8px; text-align: center; color: #94a3b8; font-size: 12px; }
+.excel-filter-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 7px; }
+.excel-filter-actions button { text-align: center; border: 1px solid #dbe3ef; }
+.excel-filter-actions .excel-filter-apply { background: var(--primary); border-color: var(--primary); color: #fff; }
+.excel-filter-actions .excel-filter-apply:hover { background: var(--primary-dark); color: #fff; }
+.excel-filter-actions .excel-filter-clear { color: #64748b; }
+
+.qb-accuracy-button {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  margin: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.qb-accuracy-button:hover,
+.qb-accuracy-button:focus-visible { background: #f1f5f9; outline: none; }
+.qb-accuracy-button .qb-stat-pill { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.qb-answer-detail-modal { width: min(880px, calc(100vw - 28px)); max-width: 880px; }
+.qb-answer-detail-summary { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 14px; }
+.qb-answer-detail-summary .badge { font-size:12px; padding:6px 10px; }
+.qb-answer-detail-table { border-collapse: separate; border-spacing: 0 5px; }
+.qb-answer-detail-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  border-bottom: 1px solid #dbe3ef;
+  font-size: 12px;
+}
+.qb-answer-detail-table tbody td {
+  vertical-align: middle;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background: transparent !important;
+}
+.qb-answer-detail-table tbody tr:hover td { background:#f8fafc !important; }
+.qb-answer-detail-table .answer-name { font-size:13px; font-weight:950; color:#0f172a; }
+.qb-answer-detail-table .answer-correct,
+.qb-answer-detail-table .answer-wrong,
+.qb-answer-detail-table .answer-unanswered { text-align:center; }
+.qb-result-chip {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:64px;
+  padding:5px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:950;
+  line-height:1;
+  border:1px solid transparent;
+}
+.qb-result-chip.answer-correct { color:#166534; background:#dcfce7; border-color:#86efac; }
+.qb-result-chip.answer-wrong { color:#b91c1c; background:#fee2e2; border-color:#fca5a5; }
+.qb-result-chip.answer-unanswered { color:#475569; background:#e2e8f0; border-color:#cbd5e1; }
+.qb-answer-legend { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 8px; font-size:12px; color:#64748b; }
+.qb-answer-legend span { display:inline-flex; align-items:center; gap:5px; }
+.qb-answer-legend i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+.qb-answer-legend .correct i { background:#16a34a; }
+.qb-answer-legend .wrong i { background:#dc2626; }
+.qb-answer-legend .unanswered i { background:#94a3b8; }
+
+@media (max-width: 720px) {
+  .admin-main table thead th.excel-filter-th { padding-right: 30px !important; }
+  .excel-filter-btn { right: 4px; width: 22px; height: 22px; }
+  .excel-sort-menu { width: min(300px, calc(100vw - 12px)); }
+}
+
 </style>
 </head>
 <body>
@@ -3627,6 +3861,10 @@ function buildQuestionAttemptRowsFromMappedActivityLogs(logs = activityLogs) {
       display_order: Number(item.no || item.displayOrder || idx + 1),
       is_correct: item.is_correct === true || item.correct === true,
       unanswered: item.unanswered === true,
+      selected_text: item.selectedText || item.selected_text || "",
+      correct_text: item.correctText || item.correct_text || "",
+      name: log?.name || detail.name || "",
+      department: log?.department || detail.department || "",
       quarter: log?.quarter || detail.quarter || "",
       submitted_at: log?.createdAt || detail.createdAt || detail.submittedAt || ""
     }));
@@ -3636,6 +3874,46 @@ function buildQuestionAttemptRowsFromMappedActivityLogs(logs = activityLogs) {
 
 function buildQuestionStatsFromActivityLogs(logs = activityLogs) {
   return buildQuestionStatsFromRows(buildQuestionAttemptRowsFromMappedActivityLogs(logs));
+}
+
+function buildQuestionAttemptDetailsFromRows(rows = []) {
+  const map = {};
+  const seenAttempts = new Set();
+
+  (rows || []).forEach((row, rowIndex) => {
+    const qid = row.question_id ?? row.questionId;
+    if (qid === null || qid === undefined || qid === "") return;
+
+    const resultId = row.result_id ?? row.resultId ?? "";
+    const employeeId = row.employee_id ?? row.employeeId ?? "";
+    const quarter = row.quarter || "";
+    const submittedAt = row.submitted_at || row.createdAt || row.submittedAt || "";
+    const displayOrder = row.display_order ?? row.displayOrder ?? row.no ?? "";
+    const sessionKey = resultId || [employeeId, quarter, submittedAt].join("|");
+    const attemptKey = [sessionKey || ("row-" + rowIndex), String(qid), String(displayOrder)].join("|");
+    if (seenAttempts.has(attemptKey)) return;
+    seenAttempts.add(attemptKey);
+
+    const key = String(qid);
+    if (!map[key]) map[key] = [];
+    map[key].push({
+      resultId: String(resultId || ""),
+      employeeId: String(employeeId || ""),
+      name: row.name || "",
+      department: row.department || "",
+      quarter,
+      submittedAt,
+      isCorrect: row.is_correct === true || row.correct === true,
+      unanswered: row.unanswered === true,
+      selectedText: row.selected_text || row.selectedText || "",
+      correctText: row.correct_text || row.correctText || ""
+    });
+  });
+
+  Object.values(map).forEach((items) => {
+    items.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+  });
+  return map;
 }
 
 async function _sbFetchQuestionAttemptRowsFromActivityLogs() {
@@ -3673,6 +3951,10 @@ async function _sbFetchQuestionAttemptRowsFromActivityLogs() {
         display_order: Number(item.no || item.displayOrder || idx + 1),
         is_correct: item.is_correct === true || item.correct === true,
         unanswered: item.unanswered === true,
+        selected_text: item.selectedText || item.selected_text || "",
+        correct_text: item.correctText || item.correct_text || "",
+        name: detail.name || "",
+        department: detail.department || "",
         quarter: detail.quarter || "",
         submitted_at: detail.createdAt || detail.submittedAt || row.created_at || ""
       }));
@@ -3684,7 +3966,11 @@ async function _sbFetchQuestionAttemptRowsFromActivityLogs() {
 }
 
 async function _sbFetchQuestionStats() {
-  if (!_sb) return buildQuestionStatsFromActivityLogs();
+  if (!_sb) {
+    const fallbackRows = buildQuestionAttemptRowsFromMappedActivityLogs(activityLogs);
+    questionAttemptDetails = buildQuestionAttemptDetailsFromRows(fallbackRows);
+    return buildQuestionStatsFromRows(fallbackRows);
+  }
 
   const combinedRows = [];
   let answerTableError = null;
@@ -3694,7 +3980,7 @@ async function _sbFetchQuestionStats() {
   try {
     const { data, error } = await _sb
       .from("exam_submission_answers")
-      .select("result_id,employee_id,question_id,display_order,is_correct,unanswered,quarter,submitted_at")
+      .select("*")
       .limit(20000);
     if (error) throw error;
     combinedRows.push(...(data || []));
@@ -3715,8 +4001,11 @@ async function _sbFetchQuestionStats() {
   }
 
   if (!combinedRows.length && (answerTableError || activityLogError)) {
-    return buildQuestionStatsFromActivityLogs();
+    const fallbackRows = buildQuestionAttemptRowsFromMappedActivityLogs(activityLogs);
+    questionAttemptDetails = buildQuestionAttemptDetailsFromRows(fallbackRows);
+    return buildQuestionStatsFromRows(fallbackRows);
   }
+  questionAttemptDetails = buildQuestionAttemptDetailsFromRows(combinedRows);
   return buildQuestionStatsFromRows(combinedRows);
 }
 
@@ -3733,7 +4022,9 @@ function ensureQuestionStatsLoaded(force = false) {
     })
     .catch((err) => {
       console.warn("문항 통계 조회 실패", err);
-      questionStats = buildQuestionStatsFromActivityLogs();
+      const fallbackRows = buildQuestionAttemptRowsFromMappedActivityLogs(activityLogs);
+      questionAttemptDetails = buildQuestionAttemptDetailsFromRows(fallbackRows);
+      questionStats = buildQuestionStatsFromRows(fallbackRows);
       questionStatsLoaded = true;
       questionStatsLoading = false;
       if (state.view === "admin" && state.adminSection === "questions") renderAdminDashboard();
@@ -3762,18 +4053,81 @@ function renderQuestionAccuracyCell(questionId) {
     return `<div class="qb-stat-cell"><span class="qb-stat-pill empty">계산중</span><div class="qb-stat-meta">통계 로드</div></div>`;
   }
   if (!stat || !stat.attempts) {
-    return `<div class="qb-stat-cell"><span class="qb-stat-pill empty">-</span><div class="qb-stat-meta">출제 기록 없음</div></div>`;
+    return `<div class="qb-stat-cell"><span class="qb-stat-pill empty">-</span><div class="qb-stat-meta">0/0</div></div>`;
   }
   const cls = stat.accuracy < 30 ? "low" : (stat.accuracy >= 75 ? "good" : "mid");
-  return `<div class="qb-stat-cell" title="출제 ${stat.attempts}회, 정답 ${stat.correct}회, 오답/미응답 ${stat.wrong}회"><span class="qb-stat-pill ${cls}">${stat.accuracy}%</span><div class="qb-stat-meta">${stat.correct}/${stat.attempts}</div></div>`;
+  return `<button type="button" class="qb-accuracy-button" data-question-id="${escapeHtml(questionId)}" onclick="openQuestionAccuracyDetail(this.dataset.questionId)" title="클릭하여 응시자별 정답/오답 확인"><div class="qb-stat-cell"><span class="qb-stat-pill ${cls}">${stat.accuracy}%</span><div class="qb-stat-meta">${stat.correct}/${stat.attempts}</div></div></button>`;
+}
+
+function openQuestionAccuracyDetail(questionId) {
+  const q = questionBank.find((item) => String(item.id) === String(questionId));
+  const details = [...(questionAttemptDetails[String(questionId)] || [])];
+  const stat = getQuestionStats(questionId);
+  if (!q) return;
+
+  const detailRank = (item) => item.unanswered ? 2 : (item.isCorrect ? 1 : 0);
+  details.sort((a, b) => detailRank(a) - detailRank(b) || new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+  const rows = details.map((item) => {
+    const user = users.find((u) => String(u.employeeId) === String(item.employeeId));
+    const name = user?.name || item.name || "미확인";
+    const department = user?.department || item.department || "-";
+    const statusClass = item.unanswered ? "answer-unanswered" : (item.isCorrect ? "answer-correct" : "answer-wrong");
+    const statusLabel = item.unanswered ? "미응답" : (item.isCorrect ? "정답" : "오답");
+    return `
+      <tr>
+        <td><span class="answer-name">${escapeHtml(name)}</span></td>
+        <td>${escapeHtml(department)}</td>
+        <td style="white-space:nowrap">${escapeHtml(item.quarter || "-")}</td>
+        <td style="text-align:center"><span class="qb-result-chip ${statusClass}">${statusLabel}</span></td>
+        <td style="white-space:nowrap;font-size:12px">${item.submittedAt ? escapeHtml(formatDateTime(item.submittedAt)) : "-"}</td>
+      </tr>`;
+  }).join("");
+
+  const correct = stat?.correct ?? details.filter((x) => x.isCorrect).length;
+  const attempts = stat?.attempts ?? details.length;
+  const wrong = Math.max(0, attempts - correct);
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="questionAccuracyDetailTitle" onclick="if(event.target===this) closeModal()">
+      <section class="modal qb-answer-detail-modal">
+        <div class="section-head" style="margin-bottom:0">
+          <div>
+            <h2 id="questionAccuracyDetailTitle">문항 정답/오답 응시자</h2>
+            <p style="font-size:13px;color:var(--muted);margin:4px 0 0">${escapeHtml(q.category || "")} · ${formatText(q.text)}</p>
+          </div>
+          <button class="btn" type="button" onclick="closeModal()">닫기</button>
+        </div>
+        <div class="qb-answer-detail-summary">
+          <span class="badge">출제 ${attempts}회</span>
+          <span class="badge success">정답 ${correct}명</span>
+          <span class="badge danger">오답/미응답 ${wrong}명</span>
+          <span class="badge">정답률 ${attempts ? Math.round(correct / attempts * 100) : 0}%</span>
+        </div>
+        <div class="qb-answer-legend" aria-label="정오답 색상 안내">
+          <span class="correct"><i></i>정답자</span>
+          <span class="wrong"><i></i>오답자</span>
+          <span class="unanswered"><i></i>미응답</span>
+        </div>
+        <div class="table-wrap" style="max-height:min(58vh,520px);overflow:auto">
+          <table class="qb-answer-detail-table">
+            <thead><tr><th>응시자</th><th>소속</th><th>분기</th><th style="text-align:center">결과</th><th>제출일시</th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="5" class="empty">응시자별 상세 기록이 없습니다. 과거 기록에 answerReview 또는 상세 답안 데이터가 없으면 이름 단위 복원이 불가능합니다.</td></tr>`}</tbody>
+          </table>
+        </div>
+      </section>
+    </div>`;
 }
 
 function refreshQuestionStats() {
   questionStatsLoaded = false;
   questionStats = {};
+  questionAttemptDetails = {};
   ensureQuestionStatsLoaded(true);
   const main = document.querySelector(".admin-main");
-  if (main && state.adminSection === "questions") main.innerHTML = renderQuestionManager();
+  if (main && state.adminSection === "questions") {
+    main.innerHTML = renderQuestionManager();
+    setTimeout(() => { bindQbSearch(); initAdminTableFilters(); }, 0);
+  }
 }
 
 function buildSubmissionAnswerRows(result, log) {
@@ -4729,6 +5083,7 @@ let examResults = [];
 let activityLogs = [];
 let activeExams = [];
 let questionStats = {};
+let questionAttemptDetails = {};
 let questionStatsLoaded = false;
 let questionStatsLoading = false;
 
@@ -6432,6 +6787,388 @@ function launchConfetti(duration = 4000) {
 }
 
 
+
+
+/* ── 관리자 표 Excel-style 헤더 정렬 + 값 필터 ──────────────────
+   - 헤더 메뉴에서 오름차순/내림차순 + 컬럼의 실제 값 체크 필터 제공
+   - 여러 컬럼 필터는 AND 조건으로 결합
+   - 날짜/숫자/비율/상태/텍스트 정렬 자동 판별
+   - 검색/자동갱신으로 tbody가 다시 그려져도 정렬/필터 상태 유지
+   - 관리/상세 컬럼은 대상에서 제외
+------------------------------------------------------------------- */
+window._adminTableSorts = window._adminTableSorts || {};
+window._adminTableFilters = window._adminTableFilters || {};
+window._adminSortMenu = window._adminSortMenu || null;
+
+function _adminSortNormalizeText(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function _adminSortParseDate(text) {
+  const t = _adminSortNormalizeText(text);
+  if (!t || t === "-") return null;
+  const m = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\D+(오전|오후|AM|PM))?\D*(\d{1,2})?\D*(\d{1,2})?/i);
+  if (!m) return null;
+  let hour = Number(m[5] || 0);
+  const minute = Number(m[6] || 0);
+  const ap = String(m[4] || "").toUpperCase();
+  if ((ap === "오후" || ap === "PM") && hour < 12) hour += 12;
+  if ((ap === "오전" || ap === "AM") && hour === 12) hour = 0;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hour, minute, 0, 0);
+  const ms = d.getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function _adminSortComparable(cell) {
+  const explicit = cell?.dataset?.sortValue;
+  const text = _adminSortNormalizeText(explicit != null ? explicit : cell?.textContent);
+  if (!text || text === "-") return { empty: true, type: "text", value: "" };
+
+  const compact = text.replace(/\s+/g, "");
+  const statusOrder = {
+    "응시전": 10, "미응시": 10,
+    "응시중": 20,
+    "제출완료": 30, "응시완료": 30,
+    "합격": 40, "불합격": 50, "실격": 60,
+    "활성": 10, "비활성": 20
+  };
+  if (Object.prototype.hasOwnProperty.call(statusOrder, compact)) {
+    return { empty: false, type: "number", value: statusOrder[compact] };
+  }
+
+  const quarter = compact.match(/^(\d{4})-?Q([1-4])$/i);
+  if (quarter) return { empty: false, type: "number", value: Number(quarter[1]) * 10 + Number(quarter[2]) };
+
+  const ratio = compact.match(/^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/);
+  if (ratio) {
+    const num = Number(ratio[1]);
+    const den = Number(ratio[2]);
+    return { empty: false, type: "number", value: den ? num / den : num };
+  }
+
+  const dateValue = _adminSortParseDate(text);
+  if (dateValue != null && /\d{4}/.test(text)) return { empty: false, type: "number", value: dateValue };
+
+  const numericText = compact.replace(/,/g, "");
+  const numeric = numericText.match(/^(-?\d+(?:\.\d+)?)(?:점|회|명|분|개|문항|%)?$/);
+  if (numeric) return { empty: false, type: "number", value: Number(numeric[1]) };
+
+  return { empty: false, type: "text", value: text.toLocaleLowerCase("ko-KR") };
+}
+
+function _adminSortCompareValues(a, b, direction) {
+  if (a.empty && b.empty) return 0;
+  if (a.empty) return 1;
+  if (b.empty) return -1;
+  let diff = 0;
+  if (a.type === "number" && b.type === "number") diff = a.value - b.value;
+  else diff = String(a.value).localeCompare(String(b.value), "ko", { numeric: true, sensitivity: "base" });
+  return direction === "desc" ? -diff : diff;
+}
+
+function _adminSortTableKey(table, tableIndex = 0) {
+  if (table.dataset.excelSortKey) return table.dataset.excelSortKey;
+  const labels = Array.from(table.tHead?.rows?.[0]?.cells || [])
+    .map(th => _adminSortNormalizeText(th.dataset.excelHeaderLabel || th.childNodes?.[0]?.textContent || th.textContent))
+    .join("|");
+  const key = `${state.adminSection || "admin"}:${tableIndex}:${labels}`;
+  table.dataset.excelSortKey = key;
+  return key;
+}
+
+function _adminSortRememberOriginalOrder(table) {
+  const tbody = table?.tBodies?.[0];
+  if (!tbody) return;
+  Array.from(tbody.rows).forEach((row, idx) => {
+    if (!row.dataset.excelOriginalOrder) row.dataset.excelOriginalOrder = String(idx + 1);
+  });
+}
+
+function _adminFilterCellValue(cell) {
+  if (!cell) return { key: "__EMPTY__", label: "(빈 셀)" };
+  const explicit = cell.dataset?.filterValue;
+  const text = _adminSortNormalizeText(explicit != null ? explicit : cell.textContent);
+  return text ? { key: text, label: text } : { key: "__EMPTY__", label: "(빈 셀)" };
+}
+
+function _adminFilterGetOptions(table, columnIndex) {
+  const tbody = table?.tBodies?.[0];
+  if (!tbody) return [];
+  const map = new Map();
+  Array.from(tbody.rows).forEach((row) => {
+    if (row.cells.length === 1 && row.cells[0]?.colSpan > 1) return;
+    const cell = row.cells[columnIndex];
+    if (!cell) return;
+    const item = _adminFilterCellValue(cell);
+    if (!map.has(item.key)) map.set(item.key, item.label);
+  });
+  return Array.from(map, ([key, label]) => ({ key, label }))
+    .sort((a, b) => {
+      const ac = _adminSortComparable({ dataset: { sortValue: a.key }, textContent: a.label });
+      const bc = _adminSortComparable({ dataset: { sortValue: b.key }, textContent: b.label });
+      return _adminSortCompareValues(ac, bc, "asc");
+    });
+}
+
+function _adminFilterStateForTable(table) {
+  const key = table.dataset.excelSortKey || _adminSortTableKey(table, 0);
+  if (!window._adminTableFilters[key]) window._adminTableFilters[key] = {};
+  return window._adminTableFilters[key];
+}
+
+function applyAdminTableFilters(table) {
+  const tbody = table?.tBodies?.[0];
+  if (!tbody) return;
+  const filters = _adminFilterStateForTable(table);
+  const activeEntries = Object.entries(filters).filter(([, cfg]) => cfg && Array.isArray(cfg.selected));
+
+  Array.from(tbody.rows).forEach((row) => {
+    if (row.cells.length === 1 && row.cells[0]?.colSpan > 1) {
+      row.hidden = false;
+      return;
+    }
+    const visible = activeEntries.every(([columnText, cfg]) => {
+      const columnIndex = Number(columnText);
+      const cell = row.cells[columnIndex];
+      if (!cell) return false;
+      const value = _adminFilterCellValue(cell).key;
+      return cfg.selected.includes(value);
+    });
+    row.hidden = !visible;
+  });
+  _updateAdminFilterHeaders(table);
+}
+
+function reapplyAdminTableFilters(table) {
+  if (!table) return;
+  applyAdminTableFilters(table);
+}
+
+function applyAdminTableSort(table, columnIndex, direction, persist = true) {
+  const tbody = table?.tBodies?.[0];
+  if (!tbody) return;
+  _adminSortRememberOriginalOrder(table);
+  const key = table.dataset.excelSortKey || _adminSortTableKey(table, 0);
+  const rows = Array.from(tbody.rows);
+
+  if (!direction) {
+    rows.sort((a, b) => Number(a.dataset.excelOriginalOrder || 0) - Number(b.dataset.excelOriginalOrder || 0));
+    rows.forEach(row => tbody.appendChild(row));
+    if (persist) delete window._adminTableSorts[key];
+    _updateAdminSortHeaders(table, null, null);
+    applyAdminTableFilters(table);
+    return;
+  }
+
+  const sortableRows = rows.map((row, idx) => ({ row, idx })).sort((A, B) => {
+    const aCell = A.row.cells[columnIndex];
+    const bCell = B.row.cells[columnIndex];
+    if (!aCell && !bCell) return A.idx - B.idx;
+    if (!aCell) return 1;
+    if (!bCell) return -1;
+    const diff = _adminSortCompareValues(_adminSortComparable(aCell), _adminSortComparable(bCell), direction);
+    return diff || (A.idx - B.idx);
+  });
+  sortableRows.forEach(item => tbody.appendChild(item.row));
+  if (persist) window._adminTableSorts[key] = { columnIndex, direction };
+  _updateAdminSortHeaders(table, columnIndex, direction);
+  applyAdminTableFilters(table);
+}
+
+function _updateAdminSortHeaders(table, activeIndex, direction) {
+  const headers = Array.from(table?.tHead?.rows?.[0]?.cells || []);
+  headers.forEach((th, idx) => {
+    th.classList.toggle("excel-sort-active", idx === activeIndex && !!direction);
+    const btn = th.querySelector(".excel-filter-btn");
+    if (!btn) return;
+    btn.textContent = idx === activeIndex && direction === "asc" ? "▲" : idx === activeIndex && direction === "desc" ? "▼" : "▾";
+    btn.setAttribute("aria-label", `${_adminSortNormalizeText(th.dataset.excelHeaderLabel || th.textContent)} 필터/정렬 메뉴`);
+  });
+  _updateAdminFilterHeaders(table);
+}
+
+function _updateAdminFilterHeaders(table) {
+  const filters = _adminFilterStateForTable(table);
+  const headers = Array.from(table?.tHead?.rows?.[0]?.cells || []);
+  headers.forEach((th, idx) => {
+    const active = !!filters[idx] && Array.isArray(filters[idx].selected);
+    th.classList.toggle("excel-filter-active", active);
+    const btn = th.querySelector(".excel-filter-btn");
+    if (btn) btn.title = active ? "필터 적용됨 · 클릭하여 변경" : "필터/정렬";
+  });
+}
+
+function reapplyAdminTableSort(table) {
+  if (!table) return;
+  _adminSortRememberOriginalOrder(table);
+  const key = table.dataset.excelSortKey;
+  const saved = key ? window._adminTableSorts[key] : null;
+  if (saved) applyAdminTableSort(table, saved.columnIndex, saved.direction, false);
+  else applyAdminTableFilters(table);
+}
+
+function closeAdminSortMenu() {
+  if (window._adminSortMenu) {
+    window._adminSortMenu.remove();
+    window._adminSortMenu = null;
+  }
+}
+
+function _adminPositionFilterMenu(menu, button) {
+  const rect = button.getBoundingClientRect();
+  const menuWidth = Math.min(340, window.innerWidth - 16);
+  const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${rect.bottom + 6}px`;
+  requestAnimationFrame(() => {
+    const height = menu.offsetHeight;
+    if (rect.bottom + 6 + height > window.innerHeight - 8) {
+      menu.style.top = `${Math.max(8, rect.top - height - 6)}px`;
+    }
+  });
+}
+
+function openAdminSortMenu(button, table, columnIndex, label) {
+  closeAdminSortMenu();
+  const key = table.dataset.excelSortKey || _adminSortTableKey(table, 0);
+  const options = _adminFilterGetOptions(table, columnIndex);
+  const filters = _adminFilterStateForTable(table);
+  const savedFilter = filters[columnIndex];
+  const selected = savedFilter && Array.isArray(savedFilter.selected)
+    ? new Set(savedFilter.selected)
+    : new Set(options.map((item) => item.key));
+
+  const menu = document.createElement("div");
+  menu.className = "excel-sort-menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML = `
+    <div class="excel-sort-menu-title">${escapeHtml(label)} 필터</div>
+    <button type="button" data-dir="asc">↑ 오름차순 정렬</button>
+    <button type="button" data-dir="desc">↓ 내림차순 정렬</button>
+    <button type="button" data-dir="">↕ 정렬 해제</button>
+    <div class="excel-sort-divider"></div>
+    <input class="excel-filter-search" type="search" placeholder="옵션 검색" aria-label="${escapeHtml(label)} 옵션 검색">
+    <label class="excel-filter-select-all"><input type="checkbox" class="excel-filter-all"> <span>(전체 선택)</span></label>
+    <div class="excel-filter-options">
+      ${options.length ? options.map((item, idx) => `<label class="excel-filter-option" data-option-index="${idx}"><input type="checkbox" data-value-index="${idx}" ${selected.has(item.key) ? "checked" : ""}> <span>${escapeHtml(item.label)}</span></label>`).join("") : `<div class="excel-filter-empty">표시할 옵션이 없습니다.</div>`}
+    </div>
+    <div class="excel-filter-actions">
+      <button type="button" class="excel-filter-clear">필터 해제</button>
+      <button type="button" class="excel-filter-apply">필터 적용</button>
+    </div>`;
+  document.body.appendChild(menu);
+  window._adminSortMenu = menu;
+  _adminPositionFilterMenu(menu, button);
+
+  // 체크박스·검색창·옵션 목록을 조작하는 동안 바깥 이벤트가 메뉴를 닫지 않도록 격리합니다.
+  ["pointerdown", "mousedown", "click", "touchstart"].forEach((type) => {
+    menu.addEventListener(type, (event) => event.stopPropagation());
+  });
+
+  menu.querySelectorAll("button[data-dir]").forEach((item) => {
+    item.addEventListener("click", (event) => {
+      event.stopPropagation();
+      applyAdminTableSort(table, columnIndex, item.dataset.dir || null, true);
+      closeAdminSortMenu();
+    });
+  });
+
+  const allBox = menu.querySelector(".excel-filter-all");
+  const optionBoxes = () => Array.from(menu.querySelectorAll("input[data-value-index]"));
+  const updateAllBox = () => {
+    const boxes = optionBoxes().filter((box) => !box.closest(".excel-filter-option")?.hidden);
+    const checked = boxes.filter((box) => box.checked).length;
+    allBox.checked = boxes.length > 0 && checked === boxes.length;
+    allBox.indeterminate = checked > 0 && checked < boxes.length;
+  };
+  updateAllBox();
+
+  allBox.addEventListener("change", () => {
+    optionBoxes().forEach((box) => {
+      const row = box.closest(".excel-filter-option");
+      if (!row?.hidden) box.checked = allBox.checked;
+    });
+    updateAllBox();
+  });
+  optionBoxes().forEach((box) => box.addEventListener("change", updateAllBox));
+
+  const search = menu.querySelector(".excel-filter-search");
+  search.addEventListener("input", () => {
+    const kw = _adminSortNormalizeText(search.value).toLocaleLowerCase("ko-KR");
+    menu.querySelectorAll(".excel-filter-option").forEach((row) => {
+      const text = _adminSortNormalizeText(row.textContent).toLocaleLowerCase("ko-KR");
+      row.hidden = !!kw && !text.includes(kw);
+    });
+    updateAllBox();
+  });
+
+  menu.querySelector(".excel-filter-clear").addEventListener("click", () => {
+    delete filters[columnIndex];
+    if (!Object.keys(filters).length) delete window._adminTableFilters[key];
+    applyAdminTableFilters(table);
+    closeAdminSortMenu();
+  });
+
+  menu.querySelector(".excel-filter-apply").addEventListener("click", () => {
+    const checkedKeys = optionBoxes().filter((box) => box.checked).map((box) => options[Number(box.dataset.valueIndex)]?.key).filter((v) => v !== undefined);
+    if (checkedKeys.length === options.length) delete filters[columnIndex];
+    else filters[columnIndex] = { selected: checkedKeys };
+    if (!Object.keys(filters).length) delete window._adminTableFilters[key];
+    applyAdminTableFilters(table);
+    closeAdminSortMenu();
+  });
+
+  setTimeout(() => search?.focus(), 0);
+}
+
+function initAdminTableFilters() {
+  closeAdminSortMenu();
+  const tables = Array.from(document.querySelectorAll(".admin-main table"));
+  tables.forEach((table, tableIndex) => {
+    if (!table.tHead || !table.tBodies.length || !table.tHead.rows.length) return;
+    const key = _adminSortTableKey(table, tableIndex);
+    const headers = Array.from(table.tHead.rows[0].cells);
+    headers.forEach((th, columnIndex) => {
+      const rawLabel = _adminSortNormalizeText(th.dataset.excelHeaderLabel || th.textContent);
+      const label = rawLabel.replace(/[▾▲▼]$/g, "").trim();
+      th.dataset.excelHeaderLabel = label;
+      if (["관리", "상세"].includes(label) || th.dataset.noSort === "true") return;
+      th.classList.add("excel-filter-th");
+      if (th.querySelector(".excel-filter-btn")) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "excel-filter-btn";
+      btn.textContent = "▾";
+      btn.title = "필터/정렬";
+      btn.setAttribute("aria-label", `${label} 필터/정렬 메뉴`);
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openAdminSortMenu(btn, table, columnIndex, label);
+      });
+      th.appendChild(btn);
+    });
+    table.dataset.excelSortKey = key;
+    _adminSortRememberOriginalOrder(table);
+    reapplyAdminTableSort(table);
+    reapplyAdminTableFilters(table);
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (window._adminSortMenu && !event.target.closest(".excel-sort-menu") && !event.target.closest(".excel-filter-btn")) closeAdminSortMenu();
+});
+window.addEventListener("resize", closeAdminSortMenu);
+window.addEventListener("scroll", (event) => {
+  const menu = window._adminSortMenu;
+  if (!menu) return;
+  const target = event.target;
+  // 필터 옵션 영역 안쪽 스크롤은 메뉴 사용 중인 정상 동작이므로 닫지 않습니다.
+  if (target instanceof Node && menu.contains(target)) return;
+  closeAdminSortMenu();
+}, true);
+
+
 /* ── js/admin.js ── */
 "use strict";
 
@@ -6453,8 +7190,10 @@ function refreshFromRemote() {
 
 function refreshQuestionManager() {
   const main = document.querySelector(".admin-main");
-  if (main) main.innerHTML = renderQuestionManager();
-  else renderAdminDashboard();
+  if (main) {
+    main.innerHTML = renderQuestionManager();
+    setTimeout(() => { bindQbSearch(); initAdminTableFilters(); }, 0);
+  } else renderAdminDashboard();
 }
 
 function updateQuestionFilter(input) {
@@ -6514,7 +7253,7 @@ function refreshQuestionTable() {
             ${escapeHtml(q.category)}
           </span>
         </td>
-        <td style="font-size:13px;line-height:1.5;padding:10px 12px">
+        <td style="font-size:13px;line-height:1.5;padding:10px 12px" data-filter-value="${escapeHtml(q.text)}">
           ${formatText(q.text)}
           <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">
             ${(q.options||[]).map((opt,oi) => `
@@ -6527,8 +7266,8 @@ function refreshQuestionTable() {
           </div>
         </td>
         <td style="text-align:center;font-weight:700;color:#059669">${Number(q.answerIndex)+1}번</td>
-        <td style="text-align:center">${renderQuestionAttemptCountCell(q.id)}</td>
-        <td style="text-align:center">${renderQuestionAccuracyCell(q.id)}</td>
+        <td style="text-align:center" data-sort-value="${getQuestionStats(q.id)?.attempts ?? 0}" data-filter-value="${getQuestionStats(q.id)?.attempts ?? 0}회">${renderQuestionAttemptCountCell(q.id)}</td>
+        <td style="text-align:center" data-sort-value="${getQuestionStats(q.id)?.accuracy ?? -1}" data-filter-value="${getQuestionStats(q.id)?.accuracy == null ? "기록 없음" : `${getQuestionStats(q.id).accuracy}%`}">${renderQuestionAccuracyCell(q.id)}</td>
         <td style="text-align:center">
           <span class="badge ${q.active?"success":"danger"}">${q.active?"활성":"비활성"}</span>
         </td>
@@ -6540,6 +7279,9 @@ function refreshQuestionTable() {
       </tr>`).join("");
   }
   if (countEl) countEl.textContent = `${filtered.length}/${questionBank.length}문항 표시`;
+  const table = tbody.closest("table");
+  reapplyAdminTableSort(table);
+  reapplyAdminTableFilters(table);
 }
 
 function renderAdminDashboard() {
@@ -6582,6 +7324,7 @@ function renderAdminDashboard() {
   if (state.adminSection === "users") {
     setTimeout(() => bindUserSearch(), 0);
   }
+  setTimeout(() => initAdminTableFilters(), 0);
 }
 
 function adminNavButton(section, label) {
@@ -7205,7 +7948,7 @@ function _buildUserRowsHtml(rows) {
       <td class="fixed-name">${latest
         ? `<button class="link-button" type="button" style="font-weight:800;text-decoration:underline;text-underline-offset:3px" title="제출 문제세트/선택 답안 보기" onclick="openSubmittedAnswerModal('${encodeURIComponent(user.employeeId)}')">${escapeHtml(user.name)}</button>`
         : `<strong>${escapeHtml(user.name)}</strong>`}</td>
-      <td>${statusBadge}</td>
+      <td data-filter-value="${escapeHtml(status.label)}">${statusBadge}</td>
       <td class="fixed-score">${displayLatest ? `<strong>${displayLatest.percentageScore}점</strong>` : "-"}</td>
       <td class="fixed-pass">${passBadge}</td>
       <td style="text-align:center" class="${tabCount >= examSettings.tabSwitchLimit ? 'leave-warning' : ''}">${tabBadge}</td>
@@ -7225,6 +7968,7 @@ function refreshUserTable() {
   if (!tbody) { renderAdminDashboard(); return; }
   // filterUsers() 결과를 _buildUserRowsHtml에서 정렬+중복제거
   tbody.innerHTML = _buildUserRowsHtml(filterUsers());
+  reapplyAdminTableSort(tbody.closest("table"));
 }
 
 function bindUserSearch() {
@@ -7737,7 +8481,7 @@ function renderQuestionManager() {
                     ${escapeHtml(q.category)}
                   </span>
                 </td>
-                <td style="font-size:13px;line-height:1.5;padding:10px 12px">
+                <td style="font-size:13px;line-height:1.5;padding:10px 12px" data-filter-value="${escapeHtml(q.text)}">
                   ${formatText(q.text)}
                   <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">
                     ${(q.options||[]).map((opt,oi) => `
@@ -7750,8 +8494,8 @@ function renderQuestionManager() {
                   </div>
                 </td>
                 <td style="text-align:center;font-weight:700;color:#059669">${Number(q.answerIndex)+1}번</td>
-                <td style="text-align:center">${renderQuestionAttemptCountCell(q.id)}</td>
-                <td style="text-align:center">${renderQuestionAccuracyCell(q.id)}</td>
+                <td style="text-align:center" data-sort-value="${getQuestionStats(q.id)?.attempts ?? 0}" data-filter-value="${getQuestionStats(q.id)?.attempts ?? 0}회">${renderQuestionAttemptCountCell(q.id)}</td>
+                <td style="text-align:center" data-sort-value="${getQuestionStats(q.id)?.accuracy ?? -1}" data-filter-value="${getQuestionStats(q.id)?.accuracy == null ? "기록 없음" : `${getQuestionStats(q.id).accuracy}%`}">${renderQuestionAccuracyCell(q.id)}</td>
                 <td style="text-align:center">
                   <span class="badge ${q.active?"success":"danger"}">${q.active?"활성":"비활성"}</span>
                 </td>
@@ -8246,7 +8990,7 @@ function renderResultsManager() {
                     <td class="fixed-name">${escapeHtml(r.name)}</td>
                     <td>${r.correctCount}/${r.totalCount}</td>
                     <td class="fixed-score"><strong>${r.percentageScore}점</strong></td>
-                    <td class="fixed-pass">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
+                    <td class="fixed-pass" data-filter-value="${r.disqualified ? "실격" : (r.passed ? "합격" : "불합격")}">${renderResultBadge(r)}${r.disqualificationReason ? `<br><span class="muted">${escapeHtml(r.disqualificationReason)}</span>` : ""}</td>
                     <td>${validity ? `${formatDateOnly(validity.validFrom)} ~ ${formatDateOnly(validity.validUntil)}` : "-"}</td>
                     <td>${r.tabSwitchCount ?? 0}회</td>
                     <td><button class="result-detail-btn" type="button" onclick="openSubmittedAnswerModal('${encodeURIComponent(r.employeeId)}','${encodeURIComponent(r.quarter || "")}','${encodeURIComponent(r.resultId || "")}')">보기</button></td>
