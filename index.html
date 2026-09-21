@@ -14,7 +14,7 @@
         "/>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net"/>
-  <title>안전담당자 자격인증제</title>
+  <title>안전 자격인증제</title>
   <style>
 /* 로컬 Pretendard Variable 폰트 사용: GitHub 저장소 루트의 ./PretendardVariable.woff2 */
 @font-face {
@@ -222,6 +222,40 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.6; }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px;
+}
+
+/* ── Exam catalog ── */
+.exam-catalog-wrap { width:min(900px, calc(100% - 32px)); margin:0 auto; padding:48px 0 72px; }
+.exam-catalog-head { margin-bottom:26px; text-align:center; }
+.exam-catalog-head h2 { margin:0 0 8px; font-size:30px; letter-spacing:-.045em; }
+.exam-catalog-head p { margin:0; color:var(--muted); }
+.exam-catalog-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px; }
+.exam-choice-card { position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:center; min-height:268px; padding:32px 28px 26px; border:1px solid var(--line); border-radius:24px; background:var(--panel); box-shadow:var(--shadow-sm); text-align:center; transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.exam-choice-card:hover { transform:translateY(-3px); border-color:#93c5fd; box-shadow:0 18px 36px rgba(15,23,42,.1); }
+.exam-choice-card.crane:hover { border-color:#fdba74; }
+.exam-choice-card.unavailable { background:#eef1f5; border-color:#d5dae1; box-shadow:none; filter:grayscale(1); opacity:.68; }
+.exam-choice-card.unavailable:hover { transform:none; border-color:#d5dae1; box-shadow:none; }
+.exam-choice-card.unavailable .exam-choice-emoji { background:#dfe4ea; }
+.exam-choice-card.unavailable .btn { background:#9ca3af; border-color:#9ca3af; color:#fff; }
+.exam-choice-emoji { display:grid; place-items:center; width:92px; height:92px; margin-bottom:18px; border-radius:26px; background:#eff6ff; font-size:48px; line-height:1; }
+.exam-choice-card.crane .exam-choice-emoji { background:#fff7ed; }
+.exam-choice-card h3 { margin:0 0 18px; font-size:23px; line-height:1.4; letter-spacing:-.04em; word-break:keep-all; }
+.exam-choice-action { width:100%; margin-top:auto; }
+.exam-choice-status { display:inline-flex; align-items:center; min-height:28px; margin-bottom:16px; padding:5px 10px; border-radius:999px; background:#eef4ff; color:var(--primary); font-size:12px; font-weight:800; }
+.exam-choice-status.complete { background:var(--success-bg); color:var(--success); }
+.exam-choice-status.locked { background:#f1f5f9; color:#64748b; }
+.selected-exam-banner { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:0 0 16px; padding:13px 16px; border:1px solid #bfdbfe; border-radius:14px; background:#eff6ff; }
+.selected-exam-banner strong { color:#1e3a8a; }
+.admin-exam-tabs { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:14px 0 0; }
+.admin-exam-tab { min-height:58px; padding:8px 6px; border:1px solid var(--line); border-radius:12px; background:var(--panel-2); color:var(--muted); font-size:12px; font-weight:900; line-height:1.35; cursor:pointer; }
+.admin-exam-tab:hover { border-color:#93c5fd; color:var(--primary); }
+.admin-exam-tab.active { border-color:var(--primary); background:var(--primary-soft); color:var(--primary-dark); box-shadow:inset 0 0 0 1px var(--primary); }
+.admin-exam-tab.crane.active { border-color:#ea580c; background:#fff7ed; color:#9a3412; box-shadow:inset 0 0 0 1px #ea580c; }
+@media (max-width:720px) {
+  .exam-catalog-grid { grid-template-columns:1fr; }
+  .exam-catalog-wrap { width:min(100% - 24px, 1040px); padding-top:24px; }
+  .exam-choice-card { min-height:0; padding:22px; }
+  .selected-exam-banner { align-items:flex-start; flex-direction:column; }
 }
 .section-head {
   display: flex; align-items: flex-start;
@@ -3329,6 +3363,105 @@ function getCurrentQuarter(date = new Date()) {
   return `${year}-Q${quarter}`;
 }
 
+const DEFAULT_EXAM_CODE = "SAFETY_MANAGER_CERT";
+const CRANE_EXAM_CODE = "CRANE_SPECIAL_SAFETY";
+const EXAM_ASSIGNMENT_MARKER_PREFIX = "EXAM:";
+const INACTIVE_EXAM_MARKER = "INACTIVE";
+const FALLBACK_EXAMS = [
+  {
+    code: DEFAULT_EXAM_CODE,
+    name: "안전담당자 자격인증제",
+    emoji: "🦺",
+    description: "현장 안전담당자 자격을 확인하는 인증 시험입니다.",
+    active: true,
+    sortOrder: 1,
+    chatInviteEnabled: true
+  },
+  {
+    code: CRANE_EXAM_CODE,
+    name: "크레인 특별안전교육 인증제",
+    emoji: "🏗️",
+    description: "크레인 작업 특별안전교육 이수 내용을 확인하는 인증 시험입니다.",
+    active: true,
+    sortOrder: 2,
+    chatInviteEnabled: false
+  }
+];
+
+function normalizeExamCode(value) {
+  return String(value || DEFAULT_EXAM_CODE).trim() || DEFAULT_EXAM_CODE;
+}
+
+function encodeExamAssignmentMarker(examCode) {
+  return EXAM_ASSIGNMENT_MARKER_PREFIX + (examCode ? normalizeExamCode(examCode) : INACTIVE_EXAM_MARKER);
+}
+
+function decodeExamAssignmentMarker(value) {
+  const raw = String(value || "").trim();
+  if (!raw.startsWith(EXAM_ASSIGNMENT_MARKER_PREFIX)) return "";
+  const code = raw.slice(EXAM_ASSIGNMENT_MARKER_PREFIX.length).trim();
+  if (code === INACTIVE_EXAM_MARKER) return INACTIVE_EXAM_MARKER;
+  return code ? normalizeExamCode(code) : "";
+}
+
+function getSelectedExamCode() {
+  return normalizeExamCode(state?.selectedExamCode);
+}
+
+function getExamDefinition(code = getSelectedExamCode()) {
+  const normalized = normalizeExamCode(code);
+  return exams.find((exam) => exam.code === normalized)
+    || FALLBACK_EXAMS.find((exam) => exam.code === normalized)
+    || FALLBACK_EXAMS[0];
+}
+
+function getExamDisplayName(code = getSelectedExamCode()) {
+  const normalized = normalizeExamCode(code);
+  return FALLBACK_EXAMS.find((exam) => exam.code === normalized)?.name || getExamDefinition(normalized).name;
+}
+
+function getExamEmoji(code = getSelectedExamCode()) {
+  return FALLBACK_EXAMS.find((exam) => exam.code === normalizeExamCode(code))?.emoji || "📝";
+}
+
+function getSelectedExamName() {
+  return getExamDisplayName();
+}
+
+function getExamCategoryName(examCode = getSelectedExamCode()) {
+  return normalizeExamCode(examCode) === CRANE_EXAM_CODE ? "크레인" : "안전담당자";
+}
+
+function addCalendarMonths(value, months) {
+  const source = new Date(value);
+  const day = source.getDate();
+  const result = new Date(source);
+  result.setDate(1);
+  result.setMonth(result.getMonth() + Number(months || 0));
+  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(day, lastDay));
+  return result;
+}
+
+function getExamPeriod(examCode = getSelectedExamCode(), date = new Date()) {
+  const code = normalizeExamCode(examCode);
+  if (code === CRANE_EXAM_CODE) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `CRANE-${year}-${month}`;
+  }
+  return getCurrentQuarter(date);
+}
+
+function getExamPeriodTitle(examCode = getSelectedExamCode()) {
+  return normalizeExamCode(examCode) === CRANE_EXAM_CODE ? "응시월" : "분기";
+}
+
+function getCraneRetakeAvailableAt(result) {
+  if (!result?.submittedAt) return null;
+  return addCalendarMonths(new Date(result.submittedAt), 6);
+}
+
 function previousQuarter() {
   const now = new Date();
   const q = Math.floor(now.getMonth() / 3) + 1;
@@ -3370,8 +3503,8 @@ function nextId(array, key) {
   return array.length ? Math.max(...array.map(item => Number(item[key]) || 0)) + 1 : 1;
 }
 
-function makeResultId(employeeId, quarter) {
-  const raw = String(employeeId || "") + "__" + String(quarter || "");
+function makeResultId(employeeId, quarter, examCode = getSelectedExamCode()) {
+  const raw = [employeeId, normalizeExamCode(examCode), quarter].map((value) => String(value || "")).join("__");
   const hash = _strHash(raw).toString(16).toUpperCase().padStart(8, "0");
   return "R-" + hash;
 }
@@ -3395,8 +3528,114 @@ function optionHtml(value, selected, label = value) {
 }
 
 // data.js 의 데이터에 의존하는 도우미 함수
+function isCandidateRole(role) {
+  const normalized = String(role || "candidate").trim().toLowerCase();
+  return !["admin", "administrator", "관리자"].includes(normalized);
+}
+
+function getCandidateProfilePool(examCode = getSelectedExamCode()) {
+  const code = normalizeExamCode(examCode);
+  const profiles = new Map();
+  const put = (profile = {}) => {
+    const employeeId = String(profile.employeeId || "").trim();
+    if (!employeeId) return;
+    const current = profiles.get(employeeId) || {};
+    profiles.set(employeeId, {
+      employeeId,
+      department: profile.department || current.department || "",
+      name: profile.name || current.name || "",
+      role: current.role || profile.role || "candidate",
+      assignmentExamCode: current.assignmentExamCode || profile.assignmentExamCode || ""
+    });
+  };
+
+  // 현재 users 명단을 기본으로 사용하되, 과거 결과만 남아 있는 응시자도 관리자 명단에서 복원합니다.
+  users.filter((user) => isCandidateRole(user.role)).forEach(put);
+  const resultSource = allExamResults.length ? allExamResults : examResults;
+  resultSource
+    .filter((result) => normalizeExamCode(result.examCode) === code)
+    .forEach((result) => put({ ...result, role: "candidate" }));
+
+  const activeSource = allActiveExams.length ? allActiveExams : activeExams;
+  const logSource = allActivityLogs.length ? allActivityLogs : activityLogs;
+  activeSource
+    .filter((active) => normalizeExamCode(active.examCode) === code)
+    .forEach((active) => {
+      const employeeId = String(active.employeeId || active.exam?.employeeId || "");
+      const matchingLog = logSource.find((log) => String(log.employeeId) === employeeId
+        && normalizeExamCode(log.examCode) === code);
+      put({
+        employeeId,
+        department: active.department || active.exam?.department || matchingLog?.department || "",
+        name: active.name || active.exam?.name || matchingLog?.name || "",
+        role: "candidate"
+      });
+    });
+
+  return [...profiles.values()];
+}
+
 function getCandidateUsers() {
-  return users.filter(user => user.role === "candidate");
+  const selectedCode = getSelectedExamCode();
+  return getCandidateProfilePool(selectedCode)
+    .filter((user) => isCandidateAssigned(user.employeeId, selectedCode));
+}
+
+function isCandidateAssigned(employeeId, examCode = getSelectedExamCode()) {
+  if (state?.isTestMode && employeeId === "TEST-0001") return true;
+  const code = normalizeExamCode(examCode);
+  const user = users.find((item) => String(item.employeeId) === String(employeeId));
+  const marker = user?.assignmentExamCode || "";
+  if (marker === INACTIVE_EXAM_MARKER) return false;
+  if (marker) return normalizeExamCode(marker) === code;
+
+  // 기존 배정 테이블은 읽기 전용 호환 데이터로 사용합니다. 여러 행이 있으면 가장 최근 활성 배정 하나만 인정합니다.
+  const assignments = examAssignments
+    .filter((item) => String(item.employeeId) === String(employeeId) && item.active !== false)
+    .sort((a, b) => new Date(b.assignedAt || 0) - new Date(a.assignedAt || 0));
+  if (assignments.length) return normalizeExamCode(assignments[0].examCode) === code;
+
+  // users에 존재하는 기존 단일시험 응시자는 안전담당자 명단으로만 유지합니다.
+  if (user && isCandidateRole(user.role)) return code === DEFAULT_EXAM_CODE;
+
+  // users 행이 없는 과거 데이터만 응시·진행 기록으로 관리자 명단에 복원합니다.
+  const resultSource = allExamResults.length ? allExamResults : examResults;
+  const activeSource = allActiveExams.length ? allActiveExams : activeExams;
+  const hasExamHistory = resultSource.some((result) => String(result.employeeId) === String(employeeId)
+      && normalizeExamCode(result.examCode) === code)
+    || activeSource.some((active) => String(active.employeeId) === String(employeeId)
+      && normalizeExamCode(active.examCode) === code);
+  return hasExamHistory;
+}
+
+function assignCandidateToExam(employeeId, examCode = getSelectedExamCode()) {
+  const code = normalizeExamCode(examCode);
+  const user = users.find((item) => String(item.employeeId) === String(employeeId));
+  if (user) user.assignmentExamCode = code;
+  examAssignments.forEach((assignment) => {
+    if (String(assignment.employeeId) === String(employeeId)) assignment.active = false;
+  });
+  const existing = examAssignments.find((assignment) => String(assignment.employeeId) === String(employeeId)
+    && normalizeExamCode(assignment.examCode) === code);
+  if (existing) {
+    existing.active = true;
+    existing.assignedAt = existing.assignedAt || new Date().toISOString();
+  } else {
+    examAssignments.push({ examCode: code, employeeId, active: true, assignedAt: new Date().toISOString() });
+  }
+}
+
+function deactivateCandidateForExam(employeeId, examCode = getSelectedExamCode()) {
+  const code = normalizeExamCode(examCode);
+  const user = users.find((item) => String(item.employeeId) === String(employeeId));
+  if (user) user.assignmentExamCode = INACTIVE_EXAM_MARKER;
+  const existing = examAssignments.find((assignment) => String(assignment.employeeId) === String(employeeId)
+    && normalizeExamCode(assignment.examCode) === code);
+  if (existing) {
+    existing.active = false;
+  } else {
+    examAssignments.push({ examCode: code, employeeId, active: false, assignedAt: new Date().toISOString() });
+  }
 }
 
 function getDepartments() {
@@ -3407,14 +3646,39 @@ function getCategories() {
   return [...new Set(questionBank.map(q => q.category))].sort();
 }
 
-function getLatestResult(employeeId) {
-  return examResults
-    .filter(result => result.employeeId === employeeId)
+function getLatestResult(employeeId, examCode = getSelectedExamCode()) {
+  const source = allExamResults.length ? allExamResults : examResults;
+  return source
+    .filter(result => result.employeeId === employeeId && normalizeExamCode(result.examCode) === normalizeExamCode(examCode))
     .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
 }
 
-function hasAttemptedThisQuarter(employeeId, quarter = getCurrentQuarter()) {
-  return examResults.some(result => result.employeeId === employeeId && result.quarter === quarter);
+function hasAttemptedThisQuarter(employeeId, quarter = getExamPeriod(), examCode = getSelectedExamCode()) {
+  const source = allExamResults.length ? allExamResults : examResults;
+  return source.some(result => result.employeeId === employeeId
+    && result.quarter === quarter
+    && normalizeExamCode(result.examCode) === normalizeExamCode(examCode));
+}
+
+function getBlockingResultForExam(employeeId, examCode = getSelectedExamCode(), now = new Date()) {
+  const code = normalizeExamCode(examCode);
+  const source = allExamResults.length ? allExamResults : examResults;
+  const results = source
+    .filter((result) => result.employeeId === employeeId && normalizeExamCode(result.examCode) === code)
+    .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+  if (code === CRANE_EXAM_CODE) {
+    const latest = results[0];
+    const availableAt = getCraneRetakeAvailableAt(latest);
+    return latest && availableAt && now < availableAt ? latest : null;
+  }
+
+  const period = getExamPeriod(code, now);
+  return results.find((result) => result.quarter === period) || null;
+}
+
+function canRetakeExam(employeeId, examCode = getSelectedExamCode(), now = new Date()) {
+  return !getBlockingResultForExam(employeeId, examCode, now);
 }
 
 
@@ -3432,7 +3696,15 @@ function cleanOrphanQuota() {
 }
 
 function getQuotaWarnings() {
-  return Object.entries(examSettings.categoryQuota)
+  const warnings = [];
+  const activeQuestionCount = questionBank.filter((q) => q.active).length;
+  const configuredQuestionCount = Object.values(examSettings.categoryQuota || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+  if (Number(examSettings.totalQuestions || 0) <= 0 || activeQuestionCount <= 0) {
+    warnings.push("이 시험은 아직 출제 문항이 등록되지 않아 응시할 수 없습니다.");
+  } else if (configuredQuestionCount <= 0) {
+    warnings.push("카테고리별 출제 문항 수를 설정해야 응시할 수 있습니다.");
+  }
+  warnings.push(...Object.entries(examSettings.categoryQuota)
     .filter(([category, count]) => {
       if (category === "테스트") return false; // 테스트 카테고리 제외
       const available = questionBank.filter(q => q.active && q.category === category).length;
@@ -3441,24 +3713,26 @@ function getQuotaWarnings() {
     .map(([category, count]) => {
       const available = questionBank.filter(q => q.active && q.category === category).length;
       return `[${category}] 출제 ${count}문항 설정 / 등록 ${available}문항 — ${Number(count) - available}문항 부족`;
-    });
+    }));
+  return warnings;
 }
 
-function getActiveExamKey(employeeId, quarter = getCurrentQuarter()) {
-  return `${employeeId}__${quarter}`;
+function getActiveExamKey(employeeId, quarter = getExamPeriod(), examCode = getSelectedExamCode()) {
+  return `${employeeId}__${normalizeExamCode(examCode)}__${quarter}`;
 }
 
-function getActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
-  const key = getActiveExamKey(employeeId, quarter);
+function getActiveExamRecord(employeeId, quarter = getExamPeriod(), examCode = getSelectedExamCode()) {
+  const key = getActiveExamKey(employeeId, quarter, examCode);
   return activeExams.find(item => item.key === key && item.status !== "submitted" && item.status !== "completed" && item.status !== "done");
 }
 
 function normalizeActiveExamRecord(row) {
   if (!row) return null;
   const snap = row.snapshot ? JSON.parse(JSON.stringify(row.snapshot)) : JSON.parse(JSON.stringify(row));
-  const key = row.key || snap.key || getActiveExamKey(row.employee_id || snap.employeeId, row.quarter || snap.quarter || getCurrentQuarter());
+  const examCode = normalizeExamCode(snap.examCode || snap.exam?.examCode || row.exam_code);
+  const key = row.key || snap.key || getActiveExamKey(row.employee_id || snap.employeeId, row.quarter || snap.quarter || getExamPeriod(examCode), examCode);
   const employeeId = snap.employeeId || row.employee_id || key.split("__")[0] || "";
-  const quarter = snap.quarter || row.quarter || key.split("__")[1] || getCurrentQuarter();
+  const quarter = snap.quarter || row.quarter || key.split("__")[2] || key.split("__")[1] || getExamPeriod(examCode);
 
   if (!snap.exam && Array.isArray(snap.questionSet)) {
     const questions = snap.questionSet.map((q) => {
@@ -3490,6 +3764,7 @@ function normalizeActiveExamRecord(row) {
     });
     snap.exam = {
       employeeId,
+      examCode,
       quarter,
       startedAt: snap.examStartedAt || snap.startedAt || row.updated_at || new Date().toISOString(),
       questions,
@@ -3505,6 +3780,7 @@ function normalizeActiveExamRecord(row) {
 
   if (snap.exam) {
     snap.exam.employeeId = snap.exam.employeeId || employeeId;
+    snap.exam.examCode = normalizeExamCode(snap.exam.examCode || examCode);
     snap.exam.quarter = snap.exam.quarter || quarter;
     if (!Array.isArray(snap.exam.answers) && snap.answers && Array.isArray(snap.exam.questions)) {
       const answers = Array(snap.exam.questions.length).fill(null);
@@ -3521,6 +3797,7 @@ function normalizeActiveExamRecord(row) {
   return {
     key,
     employeeId,
+    examCode,
     quarter,
     status: snap.status || "in_progress",
     updatedAt: snap.updatedAt || row.updated_at || new Date().toISOString(),
@@ -3553,15 +3830,16 @@ function restoreActiveExamRecord(record) {
       view: "exam",
       user: state.currentUser,
       adminSection: state.adminSection,
+      selectedExamCode: state.selectedExamCode,
       isTestMode: state.isTestMode
     }));
   } catch(e) {}
   return true;
 }
 
-async function fetchActiveExamRecordFromServer(employeeId, quarter = getCurrentQuarter()) {
+async function fetchActiveExamRecordFromServer(employeeId, quarter = getExamPeriod(), examCode = getSelectedExamCode()) {
   if (!_sb || !employeeId) return null;
-  const key = getActiveExamKey(employeeId, quarter);
+  const key = getActiveExamKey(employeeId, quarter, examCode);
   const { data, error } = await _sb.from("active_exams").select("*").eq("key", key).maybeSingle();
   if (error) throw error;
   const record = normalizeActiveExamRecord(data);
@@ -3575,10 +3853,12 @@ async function fetchActiveExamRecordFromServer(employeeId, quarter = getCurrentQ
 
 function upsertActiveExamRecord(exam, extra = {}) {
   if (!exam) return;
-  const key = getActiveExamKey(exam.employeeId, exam.quarter);
+  const examCode = normalizeExamCode(exam.examCode);
+  const key = getActiveExamKey(exam.employeeId, exam.quarter, examCode);
   const record = {
     key,
     employeeId: exam.employeeId,
+    examCode,
     quarter: exam.quarter,
     status: "in_progress",
     updatedAt: new Date().toISOString(),
@@ -3593,8 +3873,8 @@ function upsertActiveExamRecord(exam, extra = {}) {
   return record;
 }
 
-function clearActiveExamRecord(employeeId, quarter = getCurrentQuarter()) {
-  const key = getActiveExamKey(employeeId, quarter);
+function clearActiveExamRecord(employeeId, quarter = getExamPeriod(), examCode = getSelectedExamCode()) {
+  const key = getActiveExamKey(employeeId, quarter, examCode);
   activeExams = activeExams.filter(item => item.key !== key);
 }
 
@@ -3677,6 +3957,7 @@ async function _sha256(text) {
 function _fromExamResultRow(r) {
   return {
     resultId: r.result_id,
+    examCode: normalizeExamCode(r.exam_code),
     employeeId: r.employee_id,
     department: r.department,
     name: r.name,
@@ -3698,13 +3979,15 @@ function _mapUserRow(u) {
     employeeId: u.employee_id,
     department: u.department || "",
     name: u.name || "",
-    role: u.role || "candidate"
+    role: u.role || "candidate",
+    assignmentExamCode: decodeExamAssignmentMarker(u.phone)
   };
 }
 
 function _mapQuestionRow(q) {
   return {
     id: q.id,
+    examCode: normalizeExamCode(q.exam_code),
     category: q.category,
     text: q.text,
     options: [q.option_1, q.option_2, q.option_3, q.option_4, q.option_5].filter((v) => v !== null && v !== ""),
@@ -3715,6 +3998,8 @@ function _mapQuestionRow(q) {
 
 function _mapExamSettingsRow(s = {}) {
   return {
+    id: s.id ?? null,
+    examCode: normalizeExamCode(s.exam_code),
     totalQuestions: s.total_questions ?? examSettings.totalQuestions,
     timeLimitMinutes: s.time_limit_minutes ?? examSettings.timeLimitMinutes,
     passingScore: s.passing_score ?? examSettings.passingScore,
@@ -3738,6 +4023,7 @@ function _mapActivityLogRow(l, userRows = []) {
 
   return {
     logId: detail.logId || l.log_id,
+    examCode: normalizeExamCode(detail.examCode || l.exam_code),
     employeeId: l.employee_id,
     department: detail.department || user?.department || "",
     name: detail.name || user?.name || "",
@@ -3754,6 +4040,7 @@ function _mapActivityLogRow(l, userRows = []) {
 
 function _mapActiveExamRow(a, questionRows = []) {
   const snap = a?.snapshot ? JSON.parse(JSON.stringify(a.snapshot)) : {};
+  const examCode = normalizeExamCode(snap.examCode || snap.exam?.examCode || a?.exam_code);
   if (!snap.exam && Array.isArray(snap.questionSet)) {
     const questions = snap.questionSet.map((q) => {
       const source = (questionRows || []).find((row) => String(row.id) === String(q.id || q.questionId));
@@ -3783,8 +4070,9 @@ function _mapActiveExamRow(a, questionRows = []) {
       }
     });
     snap.exam = {
+      examCode,
       employeeId: snap.employeeId || a.employee_id,
-      quarter: snap.quarter || a.quarter || getCurrentQuarter(),
+      quarter: snap.quarter || a.quarter || getExamPeriod(examCode),
       startedAt: snap.examStartedAt || snap.startedAt || a.updated_at,
       questions,
       answers,
@@ -3796,7 +4084,13 @@ function _mapActiveExamRow(a, questionRows = []) {
       lastViolationAt: 0
     };
   }
-  return { key: a.key, ...(snap || {}) };
+  return {
+    key: a.key,
+    employeeId: snap.employeeId || a.employee_id || snap.exam?.employeeId || "",
+    examCode,
+    quarter: snap.quarter || a.quarter || snap.exam?.quarter || getExamPeriod(examCode),
+    ...(snap || {})
+  };
 }
 
 
@@ -3928,6 +4222,7 @@ async function _sbFetchQuestionAttemptRowsFromActivityLogs() {
     const { data, error } = await _sb
       .from("activity_logs")
       .select("log_id,employee_id,action,detail,created_at")
+      .eq("exam_code", getSelectedExamCode())
       .in("action", submitActions)
       .order("created_at", { ascending: false })
       .range(start, start + batchSize - 1);
@@ -3981,6 +4276,7 @@ async function _sbFetchQuestionStats() {
     const { data, error } = await _sb
       .from("exam_submission_answers")
       .select("*")
+      .eq("exam_code", getSelectedExamCode())
       .limit(20000);
     if (error) throw error;
     combinedRows.push(...(data || []));
@@ -4044,7 +4340,7 @@ function renderQuestionAttemptCountCell(questionId) {
   if (!stat || !stat.attempts) {
     return `<div class="qb-stat-cell"><span class="qb-stat-pill empty">0회</span><div class="qb-stat-meta">기록 없음</div></div>`;
   }
-  return `<div class="qb-stat-cell" title="최근 출제 ${stat.lastUsedAt ? formatDateTime(stat.lastUsedAt) : '-'}"><span class="qb-stat-pill">${stat.attempts}회</span><div class="qb-stat-meta">${stat.quarterCount}개 분기</div></div>`;
+  return `<div class="qb-stat-cell" title="최근 출제 ${stat.lastUsedAt ? formatDateTime(stat.lastUsedAt) : '-'}"><span class="qb-stat-pill">${stat.attempts}회</span><div class="qb-stat-meta">${stat.quarterCount}개 주기</div></div>`;
 }
 
 function renderQuestionAccuracyCell(questionId) {
@@ -4110,7 +4406,7 @@ function openQuestionAccuracyDetail(questionId) {
         </div>
         <div class="table-wrap" style="max-height:min(58vh,520px);overflow:auto">
           <table class="qb-answer-detail-table">
-            <thead><tr><th>응시자</th><th>소속</th><th>분기</th><th style="text-align:center">결과</th><th>제출일시</th></tr></thead>
+            <thead><tr><th>응시자</th><th>소속</th><th>${getExamPeriodTitle()}</th><th style="text-align:center">결과</th><th>제출일시</th></tr></thead>
             <tbody>${rows || `<tr><td colspan="5" class="empty">응시자별 상세 기록이 없습니다. 과거 기록에 answerReview 또는 상세 답안 데이터가 없으면 이름 단위 복원이 불가능합니다.</td></tr>`}</tbody>
           </table>
         </div>
@@ -4136,6 +4432,7 @@ function buildSubmissionAnswerRows(result, log) {
   return review.map((item, idx) => ({
     result_id: result.resultId,
     employee_id: result.employeeId,
+    exam_code: normalizeExamCode(result.examCode || log?.examCode),
     department: result.department || log?.department || "",
     name: result.name || log?.name || "",
     quarter: result.quarter || log?.quarter || "",
@@ -4200,6 +4497,7 @@ async function fetchSubmissionAnswersFromDb(employeeId, result) {
       .from("exam_submission_answers")
       .select("*")
       .eq("employee_id", employeeId)
+      .eq("exam_code", normalizeExamCode(result.examCode))
       .eq("quarter", result.quarter)
       .order("display_order", { ascending: true });
     if (result.resultId) query = query.eq("result_id", result.resultId);
@@ -4235,27 +4533,51 @@ async function fetchSubmissionAnswersFromDb(employeeId, result) {
   }
 }
 
+function _mapExamRow(row = {}) {
+  return {
+    code: normalizeExamCode(row.code),
+    name: getExamDisplayName(row.code),
+    description: row.description || "",
+    active: row.active !== false,
+    sortOrder: Number(row.sort_order || 0),
+    chatInviteEnabled: row.chat_invite_enabled !== false
+  };
+}
+
+function _mapExamAssignmentRow(row = {}) {
+  return {
+    examCode: normalizeExamCode(row.exam_code || row.examCode),
+    employeeId: String(row.employee_id || row.employeeId || ""),
+    active: row.active !== false,
+    assignedAt: row.assigned_at || row.assignedAt || null
+  };
+}
+
 async function _sbGetAppData() {
   if (!_sb) throw new Error("Supabase 클라이언트를 불러오지 못했습니다. CDN 또는 네트워크 연결을 확인하세요.");
 
-  const [usersRes, qbRes, settingsRes, resultsRes, logsRes, activeRes, affRes] = await Promise.all([
+  const [usersRes, examsRes, qbRes, settingsRes, resultsRes, logsRes, activeRes, affRes, assignmentsRes] = await Promise.all([
     _sb.from("users").select("*"),
+    _sb.from("exams").select("*").order("sort_order", { ascending: true }),
     _sb.from("question_bank").select("*"),
-    _sb.from("exam_settings").select("*").eq("id", 1).maybeSingle(),
+    _sb.from("exam_settings").select("*"),
     _sb.from("exam_results").select("*"),
     _sb.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(500),
     _sb.from("active_exams").select("*"),
-    _sb.from("affiliations").select("*")
+    _sb.from("affiliations").select("*"),
+    _sb.from("exam_assignments").select("*")
   ]);
 
   const errors = [
     ["users", usersRes.error],
+    ["exams", examsRes.error],
     ["question_bank", qbRes.error],
     ["exam_settings", settingsRes.error],
     ["exam_results", resultsRes.error],
     ["activity_logs", logsRes.error],
     ["active_exams", activeRes.error],
-    ["affiliations", affRes.error]
+    ["affiliations", affRes.error],
+    ["exam_assignments", assignmentsRes.error]
   ].filter(([, error]) => error);
 
   if (errors.length) {
@@ -4264,24 +4586,28 @@ async function _sbGetAppData() {
 
   return {
     users: (usersRes.data || []).map(_mapUserRow),
+    exams: (examsRes.data || []).map(_mapExamRow),
     questionBank: (qbRes.data || []).map(_mapQuestionRow),
-    examSettings: _mapExamSettingsRow(settingsRes.data || {}),
+    examSettingsList: (settingsRes.data || []).map(_mapExamSettingsRow),
     examResults: (resultsRes.data || []).map(_fromExamResultRow),
     activityLogs: (logsRes.data || []).map((l) => _mapActivityLogRow(l, usersRes.data || [])),
     activeExams: (activeRes.data || []).map((a) => _mapActiveExamRow(a, qbRes.data || [])),
-    managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" }))
+    managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" })),
+    examAssignments: (assignmentsRes.data || []).map(_mapExamAssignmentRow)
   };
 }
 
 async function _sbGetLoginData() {
   if (!_sb) throw new Error("Supabase 클라이언트를 불러오지 못했습니다. CDN 또는 네트워크 연결을 확인하세요.");
 
-  const [settingsRes, affRes] = await Promise.all([
-    _sb.from("exam_settings").select("*").eq("id", 1).maybeSingle(),
+  const [examsRes, settingsRes, affRes] = await Promise.all([
+    _sb.from("exams").select("*").eq("active", true).order("sort_order", { ascending: true }),
+    _sb.from("exam_settings").select("*"),
     _sb.from("affiliations").select("name,type").order("type", { ascending: true }).order("name", { ascending: true })
   ]);
 
   const errors = [
+    ["exams", examsRes.error],
     ["exam_settings", settingsRes.error],
     ["affiliations", affRes.error]
   ].filter(([, error]) => error);
@@ -4291,7 +4617,8 @@ async function _sbGetLoginData() {
   }
 
   return {
-    examSettings: _mapExamSettingsRow(settingsRes.data || {}),
+    exams: (examsRes.data || []).map(_mapExamRow),
+    examSettingsList: (settingsRes.data || []).map(_mapExamSettingsRow),
     managedAffiliations: (affRes.data || []).map((a) => ({ name: a.name, type: a.type || "이루자" }))
   };
 }
@@ -4300,7 +4627,7 @@ async function _sbFindCandidateByProfile({ department, name }) {
   if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
   const { data, error } = await _sb
     .from("users")
-    .select("employee_id,department,name,role")
+    .select("employee_id,department,name,role,phone")
     .eq("role", "candidate")
     .eq("department", department)
     .eq("name", name)
@@ -4309,23 +4636,26 @@ async function _sbFindCandidateByProfile({ department, name }) {
   return data ? _mapUserRow(data) : null;
 }
 
-async function _sbGetCandidateRuntimeData(employeeId, quarter = getCurrentQuarter()) {
+async function _sbGetCandidateRuntimeData(employeeId) {
   if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
   if (!employeeId) throw new Error("응시자 ID가 없습니다.");
 
-  const activeKey = getActiveExamKey(employeeId, quarter);
-  const [settingsRes, qbRes, resultRes, activeRes] = await Promise.all([
-    _sb.from("exam_settings").select("*").eq("id", 1).maybeSingle(),
+  const [examsRes, settingsRes, qbRes, resultRes, activeRes, assignmentsRes] = await Promise.all([
+    _sb.from("exams").select("*").eq("active", true).order("sort_order", { ascending: true }),
+    _sb.from("exam_settings").select("*"),
     _sb.from("question_bank").select("*"),
-    _sb.from("exam_results").select("*").eq("employee_id", employeeId).eq("quarter", quarter).order("submitted_at", { ascending: false }).limit(1),
-    _sb.from("active_exams").select("*").eq("key", activeKey).maybeSingle()
+    _sb.from("exam_results").select("*").eq("employee_id", employeeId).order("submitted_at", { ascending: false }),
+    _sb.from("active_exams").select("*").eq("employee_id", employeeId),
+    _sb.from("exam_assignments").select("*").eq("employee_id", employeeId).eq("active", true)
   ]);
 
   const errors = [
+    ["exams", examsRes.error],
     ["exam_settings", settingsRes.error],
     ["question_bank", qbRes.error],
     ["exam_results", resultRes.error],
-    ["active_exams", activeRes.error]
+    ["active_exams", activeRes.error],
+    ["exam_assignments", assignmentsRes.error]
   ].filter(([, error]) => error);
 
   if (errors.length) {
@@ -4333,10 +4663,12 @@ async function _sbGetCandidateRuntimeData(employeeId, quarter = getCurrentQuarte
   }
 
   return {
-    examSettings: _mapExamSettingsRow(settingsRes.data || {}),
+    exams: (examsRes.data || []).map(_mapExamRow),
+    examSettingsList: (settingsRes.data || []).map(_mapExamSettingsRow),
     questionBank: (qbRes.data || []).map(_mapQuestionRow),
     examResults: (resultRes.data || []).map(_fromExamResultRow),
-    activeExams: activeRes.data ? [_mapActiveExamRow(activeRes.data, qbRes.data || [])] : []
+    activeExams: (activeRes.data || []).map((row) => _mapActiveExamRow(row, qbRes.data || [])),
+    examAssignments: (assignmentsRes.data || []).map(_mapExamAssignmentRow)
   };
 }
 
@@ -4345,7 +4677,7 @@ async function _sbFetchResultsPage({ page = 0, pageSize = 50 } = {}) {
   if (!_sb) throw new Error("Supabase 클라이언트를 사용할 수 없습니다.");
   const start = page * pageSize;
   const end = start + pageSize - 1;
-  let query = _sb.from("exam_results").select("*", { count: "exact" });
+  let query = _sb.from("exam_results").select("*", { count: "exact" }).eq("exam_code", getSelectedExamCode());
 
   if (state.filters.resultDepartment && state.filters.resultDepartment !== "전체") {
     query = query.eq("department", state.filters.resultDepartment);
@@ -4379,6 +4711,7 @@ async function _sbFetchLogsPage({ page = 0, pageSize = 50 } = {}) {
   const { data, error, count } = await _sb
     .from("activity_logs")
     .select("*", { count: "exact" })
+    .eq("exam_code", getSelectedExamCode())
     .order("created_at", { ascending: false })
     .range(start, end);
   if (error) throw error;
@@ -4393,7 +4726,7 @@ async function _sbSaveAppData(snapshot) {
           employee_id: u.employeeId,
           department: u.department || "",
           name: u.name || "",
-          phone: "",
+          phone: u.assignmentExamCode ? encodeExamAssignmentMarker(u.assignmentExamCode) : "",
           role: u.role || "candidate"
         })),
         { onConflict: "employee_id" }
@@ -4404,6 +4737,7 @@ async function _sbSaveAppData(snapshot) {
     if (Array.isArray(snapshot.questionBank) && snapshot.questionBank.length) {
       const rows = snapshot.questionBank.map((q) => ({
         id: q.id ?? null,
+        exam_code: normalizeExamCode(q.examCode || snapshot.examCode),
         category: q.category || "",
         text: q.text || "",
         option_1: (q.options || [])[0] || "",
@@ -4434,7 +4768,8 @@ async function _sbSaveAppData(snapshot) {
       const s = snapshot.examSettings;
       const { error } = await _sb.from("exam_settings").upsert(
         {
-          id: 1,
+          id: s.id ?? (getSelectedExamCode() === DEFAULT_EXAM_CODE ? 1 : 2),
+          exam_code: normalizeExamCode(s.examCode || snapshot.examCode),
           total_questions: s.totalQuestions,
           time_limit_minutes: s.timeLimitMinutes,
           passing_score: s.passingScore,
@@ -4470,6 +4805,25 @@ async function _sbSaveAppData(snapshot) {
   }
 }
 
+async function _sbUpsertExamCandidateData(user, examCode = getSelectedExamCode()) {
+  try {
+    if (!user?.employeeId) throw new Error("응시자 정보가 없습니다.");
+    const scopedCode = normalizeExamCode(examCode);
+    const { error: userError } = await _sb.from("users").upsert({
+      employee_id: user.employeeId,
+      department: user.department || "",
+      name: user.name || "",
+      // exam_assignments는 RLS로 쓰기가 차단되어 있으므로 현재 활성 시험을 기존 미사용 필드에 저장합니다.
+      phone: encodeExamAssignmentMarker(scopedCode),
+      role: "candidate"
+    }, { onConflict: "employee_id" });
+    if (userError) throw userError;
+    return { ok: true, examCode: scopedCode };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
 async function _sbSaveActiveExamData(record) {
   try {
     if (!record?.key) return { ok: true };
@@ -4478,7 +4832,8 @@ async function _sbSaveActiveExamData(record) {
       {
         key,
         employee_id: rest.employeeId || key?.split("__")?.[0] || "",
-        quarter: rest.quarter || key?.split("__")?.[1] || "",
+        exam_code: normalizeExamCode(rest.examCode),
+        quarter: rest.quarter || key?.split("__")?.[2] || "",
         snapshot: rest
       },
       { onConflict: "key" }
@@ -4496,6 +4851,7 @@ async function _sbInsertActivityLogData(log) {
     const { error } = await _sb.from("activity_logs").insert({
       log_id: String(log.logId || makeLogId()),
       employee_id: log.employeeId || "",
+      exam_code: normalizeExamCode(log.examCode),
       action: log.type || log.action || "",
       detail: JSON.stringify(log)
     });
@@ -4512,6 +4868,7 @@ async function _sbAppendExamSubmission(result, log) {
       .from("exam_results")
       .select("result_id")
       .eq("employee_id", result.employeeId)
+      .eq("exam_code", normalizeExamCode(result.examCode))
       .eq("quarter", result.quarter)
       .maybeSingle();
 
@@ -4523,14 +4880,16 @@ async function _sbAppendExamSubmission(result, log) {
       const duplicateLog = {
         log_id: logId,
         employee_id: result.employeeId,
+        exam_code: normalizeExamCode(result.examCode),
         action: "SUBMIT_SKIPPED_DUPLICATE",
         detail: JSON.stringify({
           logId,
           employeeId: result.employeeId,
+          examCode: normalizeExamCode(result.examCode),
           department: result.department || "",
           name: result.name || "",
           type: "SUBMIT_SKIPPED_DUPLICATE",
-          message: "이미 같은 분기에 제출한 결과가 있어 중복 제출을 저장하지 않았습니다.",
+          message: "이미 같은 응시 주기에 제출한 결과가 있어 중복 제출을 저장하지 않았습니다.",
           createdAt: now
         })
       };
@@ -4538,12 +4897,13 @@ async function _sbAppendExamSubmission(result, log) {
       const { error: dupLogError } = await _sb.from("activity_logs").insert(duplicateLog);
       if (dupLogError) console.warn("중복 제출 로그 저장 실패", dupLogError);
 
-      return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
+      return { ok: true, duplicate: true, message: "이미 같은 응시 주기에 제출한 결과가 있습니다." };
     }
 
     const { error: insertError } = await _sb.from("exam_results").insert({
       result_id: result.resultId,
       employee_id: result.employeeId,
+      exam_code: normalizeExamCode(result.examCode),
       department: result.department || "",
       name: result.name || "",
       quarter: result.quarter || "",
@@ -4560,7 +4920,7 @@ async function _sbAppendExamSubmission(result, log) {
     if (insertError) {
       const duplicate = insertError.code === "23505" || /duplicate key|unique/i.test(insertError.message || "");
       if (duplicate) {
-        return { ok: true, duplicate: true, message: "이미 같은 분기에 제출한 결과가 있습니다." };
+        return { ok: true, duplicate: true, message: "이미 같은 응시 주기에 제출한 결과가 있습니다." };
       }
       throw insertError;
     }
@@ -4569,6 +4929,7 @@ async function _sbAppendExamSubmission(result, log) {
       const { error: logError } = await _sb.from("activity_logs").insert({
         log_id: String(log.logId || makeLogId()),
         employee_id: result.employeeId,
+        exam_code: normalizeExamCode(result.examCode),
         action: log.type || log.action || "exam_submit",
         detail: JSON.stringify(log)
       });
@@ -4579,7 +4940,7 @@ async function _sbAppendExamSubmission(result, log) {
       await _sbUpsertSubmissionAnswers(result, log);
     }
 
-    const key = result.employeeId + "__" + result.quarter;
+    const key = getActiveExamKey(result.employeeId, result.quarter, result.examCode);
     const { error: activeDeleteError } = await _sb.from("active_exams").delete().eq("key", key);
     if (activeDeleteError) throw activeDeleteError;
 
@@ -4589,25 +4950,43 @@ async function _sbAppendExamSubmission(result, log) {
   }
 }
 
-async function _sbResetCandidateData(employeeId) {
+async function _sbResetCandidateData(employeeId, examCode = getSelectedExamCode()) {
   try {
     if (!employeeId) throw new Error("employeeId가 없습니다.");
+    const scopedCode = examCode ? normalizeExamCode(examCode) : null;
 
-    const { error: resultsError } = await _sb.from("exam_results").delete().eq("employee_id", employeeId);
-    if (resultsError) throw resultsError;
+    const deleteScopedRows = async (tableName) => {
+      const runDelete = async (scopeQuery) => {
+        const baseQuery = _sb.from(tableName).delete().eq("employee_id", employeeId);
+        const { error } = await scopeQuery(baseQuery);
+        if (error) throw error;
+      };
 
-    const { error: logsError } = await _sb.from("activity_logs").delete().eq("employee_id", employeeId);
-    if (logsError) throw logsError;
+      if (!scopedCode) {
+        await runDelete((query) => query);
+        return;
+      }
+
+      await runDelete((query) => query.eq("exam_code", scopedCode));
+
+      // 다중시험 도입 전 데이터는 exam_code가 NULL 또는 빈 문자열일 수 있습니다.
+      // 해당 레코드는 화면에서 기본 안전담당자 시험으로 보이므로 삭제할 때도 함께 정리합니다.
+      if (scopedCode === DEFAULT_EXAM_CODE) {
+        await runDelete((query) => query.is("exam_code", null));
+        await runDelete((query) => query.eq("exam_code", ""));
+      }
+    };
+
+    await deleteScopedRows("exam_results");
+    await deleteScopedRows("activity_logs");
 
     try {
-      const { error: answersError } = await _sb.from("exam_submission_answers").delete().eq("employee_id", employeeId);
-      if (answersError) console.warn("exam_submission_answers 삭제 실패", answersError);
+      await deleteScopedRows("exam_submission_answers");
     } catch (e) {
       console.warn("exam_submission_answers 테이블 없음 또는 권한 제한", e);
     }
 
-    const { error: activeError } = await _sb.from("active_exams").delete().like("key", employeeId + "__%");
-    if (activeError) throw activeError;
+    await deleteScopedRows("active_exams");
 
     return { ok: true };
   } catch (err) {
@@ -4617,12 +4996,35 @@ async function _sbResetCandidateData(employeeId) {
 
 async function _sbDeleteCandidateData(employeeId) {
   try {
-    const reset = await _sbResetCandidateData(employeeId);
+    const reset = await _sbResetCandidateData(employeeId, null);
     if (!reset.ok) throw new Error(reset.message || "응시자 데이터 삭제 실패");
 
     const { error: userError } = await _sb.from("users").delete().eq("employee_id", employeeId);
     if (userError) throw userError;
 
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
+async function _sbDeleteExamAssignmentData(employeeId, examCode = getSelectedExamCode(), user = {}) {
+  try {
+    if (!employeeId) throw new Error("employeeId가 없습니다.");
+    const scopedCode = normalizeExamCode(examCode);
+    const reset = await _sbResetCandidateData(employeeId, scopedCode);
+    if (!reset.ok) throw new Error(reset.message || "시험별 응시 기록 삭제 실패");
+
+    // 결과 기록에서만 복원된 과거 응시자는 users 행이 없을 수 있습니다.
+    // update 대신 upsert로 비활성 표식을 남겨 삭제 후 다시 나타나는 현상을 방지합니다.
+    const { error } = await _sb.from("users").upsert({
+      employee_id: employeeId,
+      department: user.department || "",
+      name: user.name || "",
+      phone: encodeExamAssignmentMarker(null),
+      role: "candidate"
+    }, { onConflict: "employee_id" });
+    if (error) throw error;
     return { ok: true };
   } catch (err) {
     return { ok: false, message: err.message || String(err) };
@@ -4682,10 +5084,13 @@ async function callExternalApi(action, payload = {}) {
       result = { ok: true, data: await _sbFindCandidateByProfile(payload) };
       break;
     case "getCandidateRuntimeData":
-      result = { ok: true, data: await _sbGetCandidateRuntimeData(payload.employeeId, payload.quarter) };
+      result = { ok: true, data: await _sbGetCandidateRuntimeData(payload.employeeId) };
       break;
     case "saveAppData":
       result = { ok: true, data: await _sbSaveAppData(payload) };
+      break;
+    case "upsertExamCandidateData":
+      result = { ok: true, data: await _sbUpsertExamCandidateData(payload.user, payload.examCode || getSelectedExamCode()) };
       break;
     case "saveActiveExamData":
       result = { ok: true, data: await _sbSaveActiveExamData(payload.record || payload) };
@@ -4697,10 +5102,13 @@ async function callExternalApi(action, payload = {}) {
       result = { ok: true, data: await _sbAppendExamSubmission(payload.result, payload.log) };
       break;
     case "resetCandidateData":
-      result = { ok: true, data: await _sbResetCandidateData(payload.employeeId || payload) };
+      result = { ok: true, data: await _sbResetCandidateData(payload.employeeId || payload, payload.examCode || getSelectedExamCode()) };
       break;
     case "deleteCandidateData":
       result = { ok: true, data: await _sbDeleteCandidateData(payload.employeeId || payload) };
+      break;
+    case "deleteExamAssignmentData":
+      result = { ok: true, data: await _sbDeleteExamAssignmentData(payload.employeeId || payload, payload.examCode || getSelectedExamCode(), payload.user || {}) };
       break;
     case "deleteQuestionData":
       result = { ok: true, data: await _sbDeleteQuestionData(payload.id ?? payload) };
@@ -4716,23 +5124,61 @@ async function callExternalApi(action, payload = {}) {
 }
 
 
+function activateExamData(examCode = getSelectedExamCode()) {
+  const normalized = normalizeExamCode(examCode);
+  state.selectedExamCode = normalized;
+  questionBank = allQuestionBank.filter((item) => normalizeExamCode(item.examCode) === normalized);
+  examResults = allExamResults.filter((item) => normalizeExamCode(item.examCode) === normalized);
+  activityLogs = allActivityLogs.filter((item) => normalizeExamCode(item.examCode) === normalized);
+  activeExams = allActiveExams.filter((item) => normalizeExamCode(item.examCode) === normalized);
+  const selectedSettings = examSettingsByCode[normalized];
+  examSettings = selectedSettings
+    ? { ...selectedSettings, categoryQuota: { ...(selectedSettings.categoryQuota || {}) } }
+    : {
+        examCode: normalized,
+        totalQuestions: 0,
+        timeLimitMinutes: 30,
+        passingScore: 60,
+        pointsPerQuestion: 1,
+        randomizeQuestions: true,
+        randomizeOptions: true,
+        tabSwitchLimit: 3,
+        categoryQuota: {}
+      };
+  cleanOrphanQuota();
+}
+
+function syncCurrentExamCaches() {
+  const code = getSelectedExamCode();
+  allQuestionBank = [
+    ...allQuestionBank.filter((item) => normalizeExamCode(item.examCode) !== code),
+    ...questionBank.map((item) => ({ ...item, examCode: code }))
+  ];
+  examSettingsByCode[code] = { ...examSettings, examCode: code, categoryQuota: { ...(examSettings.categoryQuota || {}) } };
+}
+
 function applyRemoteData(data) {
   if (data && Array.isArray(data.users)) users = data.users;
-  if (data && Array.isArray(data.questionBank)) questionBank = data.questionBank;
-  if (data && data.examSettings) {
-    examSettings = { ...examSettings, ...data.examSettings };
-    cleanOrphanQuota();
+  if (data && Array.isArray(data.exams) && data.exams.length) exams = data.exams;
+  if (data && Array.isArray(data.examAssignments)) examAssignments = data.examAssignments;
+  if (data && Array.isArray(data.questionBank)) allQuestionBank = data.questionBank;
+  if (data && Array.isArray(data.examSettingsList)) {
+    examSettingsByCode = Object.fromEntries(data.examSettingsList.map((settings) => [normalizeExamCode(settings.examCode), settings]));
+  } else if (data && data.examSettings) {
+    const mapped = { ...data.examSettings, examCode: normalizeExamCode(data.examSettings.examCode) };
+    examSettingsByCode[mapped.examCode] = mapped;
   }
-  if (data && Array.isArray(data.examResults)) examResults = data.examResults;
+  if (data && Array.isArray(data.examResults)) allExamResults = data.examResults;
   if (data && Array.isArray(data.activityLogs)) {
-    activityLogs = data.activityLogs;
+    allActivityLogs = data.activityLogs;
     // 다른 브라우저에서 새 제출이 생겼을 수 있으므로 문항 통계 캐시를 무효화합니다.
     questionStatsLoaded = false;
   }
-  if (data && Array.isArray(data.activeExams)) activeExams = data.activeExams;
+  if (data && Array.isArray(data.activeExams)) allActiveExams = data.activeExams;
   if (data && Array.isArray(data.managedAffiliations)) {
     managedAffiliations = normalizeManagedAffiliations(data.managedAffiliations);
   }
+  activateExamData(getSelectedExamCode());
   // 시험 진행 중인 응시자만 로컬 activeExam 병합 (초기화된 응시자는 제외)
   mergeLocalActiveExams();
 }
@@ -4827,7 +5273,8 @@ function queueRemoteSave() {
 }
 
 function _doRemoteSave() {
-  const snapshot = { users, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations };
+  syncCurrentExamCaches();
+  const snapshot = { examCode: getSelectedExamCode(), users, examAssignments, questionBank, examSettings, examResults, activityLogs, activeExams, managedAffiliations };
   if (isAppsScriptRuntime()) {
     google.script.run
       .withSuccessHandler(res => {
@@ -4865,8 +5312,8 @@ function _retryRemoteSave() {
   setTimeout(() => _doRemoteSave(), delay);
 }
 
-function getPendingSubmissionKey(employeeId, quarter) {
-  return "HNIRUJA_PENDING_SUBMISSION__" + String(employeeId || "") + "__" + String(quarter || getCurrentQuarter());
+function getPendingSubmissionKey(employeeId, quarter, examCode = getSelectedExamCode()) {
+  return "HNIRUJA_PENDING_SUBMISSION__" + String(employeeId || "") + "__" + normalizeExamCode(examCode) + "__" + String(quarter || getExamPeriod(examCode));
 }
 
 function getPendingSubmissionMaxAgeMs() {
@@ -4883,16 +5330,16 @@ function savePendingSubmission(result, log) {
       savedAt: new Date().toISOString(),
       version: 1
     };
-    sessionStorage.setItem(getPendingSubmissionKey(result.employeeId, result.quarter), JSON.stringify(payload));
+    sessionStorage.setItem(getPendingSubmissionKey(result.employeeId, result.quarter, result.examCode), JSON.stringify(payload));
   } catch (e) {
     console.warn("임시 제출 데이터 저장 실패", e);
   }
 }
 
-function clearPendingSubmission(employeeId, quarter) {
+function clearPendingSubmission(employeeId, quarter, examCode = getSelectedExamCode()) {
   try {
     if (employeeId && quarter) {
-      sessionStorage.removeItem(getPendingSubmissionKey(employeeId, quarter));
+      sessionStorage.removeItem(getPendingSubmissionKey(employeeId, quarter, examCode));
       return;
     }
     Object.keys(sessionStorage || {}).forEach((key) => {
@@ -4935,12 +5382,17 @@ async function retryPendingSubmissions(employeeId = "") {
   try {
     const res = await appendResultToSheet(pending.result, pending.log);
     if (!res?.ok) throw new Error(res?.message || "임시 제출 재전송 실패");
-    clearPendingSubmission(pending.result.employeeId, pending.result.quarter);
+    clearPendingSubmission(pending.result.employeeId, pending.result.quarter, pending.result.examCode);
 
-    const resultExists = examResults.some((r) => r.employeeId === pending.result.employeeId && r.quarter === pending.result.quarter);
-    if (!resultExists) examResults.push(pending.result);
+    const resultExists = examResults.some((r) => r.employeeId === pending.result.employeeId
+      && r.quarter === pending.result.quarter
+      && normalizeExamCode(r.examCode) === normalizeExamCode(pending.result.examCode));
+    if (!resultExists) {
+      examResults.push(pending.result);
+      allExamResults.push(pending.result);
+    }
     if (pending.log && !activityLogs.some((l) => l.logId === pending.log.logId)) activityLogs.push(pending.log);
-    clearActiveExamRecord(pending.result.employeeId, pending.result.quarter);
+    clearActiveExamRecord(pending.result.employeeId, pending.result.quarter, pending.result.examCode);
 
     return { ok: true, duplicate: !!res?.duplicate, result: pending.result };
   } catch (e) {
@@ -5044,15 +5496,23 @@ function addDays(date, days) {
 function getCertificationValidity(result) {
   if (!result || !result.passed || result.disqualified) return null;
   const validFrom = result.validFrom || addDays(new Date(result.submittedAt), 1).toISOString();
-  const until = result.validUntil ? new Date(result.validUntil) : addDays(new Date(validFrom), 365);
+  const examCode = normalizeExamCode(result.examCode);
+  const until = result.validUntil
+    ? new Date(result.validUntil)
+    : (examCode === CRANE_EXAM_CODE ? addCalendarMonths(new Date(result.submittedAt), 6) : addDays(new Date(validFrom), 365));
   if (!result.validUntil) until.setDate(until.getDate() - 1);
   return { validFrom, validUntil: result.validUntil || until.toISOString() };
 }
 
 function getResultComment(result) {
-  if (result.disqualified) return "응시하느라 고생 많으셨습니다. 실격 처리되어 다음 분기 안전담당자 시험에 다시 응시바랍니다.";
+  const isCrane = normalizeExamCode(result?.examCode) === CRANE_EXAM_CODE;
+  if (result.disqualified) return isCrane
+    ? "응시하느라 고생 많으셨습니다. 실격 처리되었으며 응시일로부터 6개월 후 다시 응시할 수 있습니다."
+    : "응시하느라 고생 많으셨습니다. 실격 처리되어 다음 분기 안전담당자 시험에 다시 응시바랍니다.";
   if (result.passed) return "응시하느라 고생 많으셨습니다. 앞으로 현장안전을 위해 힘써주시기 바랍니다.";
-  return "응시하느라 고생 많으셨습니다. 다음 분기 안전담당자 시험에 다시 응시바랍니다.";
+  return isCrane
+    ? "응시하느라 고생 많으셨습니다. 응시일로부터 6개월 후 다시 응시할 수 있습니다."
+    : "응시하느라 고생 많으셨습니다. 다음 분기 안전담당자 시험에 다시 응시바랍니다.";
 }
 
 
@@ -5062,12 +5522,15 @@ function getResultComment(result) {
 // 운영 데이터는 Supabase에서만 로드합니다.
 
 let users = [];
+let exams = FALLBACK_EXAMS.map((exam) => ({ ...exam }));
+let examAssignments = [];
 let managedAffiliations = [];
 
-
 let questionBank = [];
+let allQuestionBank = [];
 
 let examSettings = {
+  examCode: DEFAULT_EXAM_CODE,
   totalQuestions: 20,
   timeLimitMinutes: 30,
   passingScore: 60,
@@ -5077,11 +5540,15 @@ let examSettings = {
   tabSwitchLimit: 3,
   categoryQuota: {}
 };
+let examSettingsByCode = { [DEFAULT_EXAM_CODE]: { ...examSettings } };
 
 // examResults / activityLogs 는 utils.js 의 헬퍼 함수가 초기화된 뒤 채워집니다.
 let examResults = [];
 let activityLogs = [];
 let activeExams = [];
+let allExamResults = [];
+let allActivityLogs = [];
+let allActiveExams = [];
 let questionStats = {};
 let questionAttemptDetails = {};
 let questionStatsLoaded = false;
@@ -5101,7 +5568,8 @@ function _initSampleData() {
 
 const state = {
   currentUser: null,
-  view: "login",            // "login" | "candidate" | "exam" | "result" | "admin"
+  view: "login",            // "login" | "examCatalog" | "candidate" | "exam" | "result" | "adminExamCatalog" | "admin"
+  selectedExamCode: DEFAULT_EXAM_CODE,
   adminSection: "dashboard",
   theme: "light",
   loginError: "",
@@ -5167,21 +5635,24 @@ function render() {
         view: state.view,
         user: state.currentUser,
         adminSection: state.adminSection,
+        selectedExamCode: state.selectedExamCode,
         isTestMode: state.isTestMode
       }));
     } catch(e) {}
   }
   // 관리자 화면에서만 새로고침 허용, 나머지 모든 화면 차단
-  if (state.view === "admin") {
+  if (state.view === "admin" || state.view === "adminExamCatalog") {
     removeAppRefreshGuard();
   } else {
     addAppRefreshGuard();
   }
   if (state.view === "loading")   renderLoadingScreen();
   if (state.view === "login")     renderLogin();
+  if (state.view === "examCatalog") renderExamCatalog();
   if (state.view === "candidate") renderCandidateDashboard();
   if (state.view === "exam")      renderExamScreen();
   if (state.view === "result")    renderResultScreen();
+  if (state.view === "adminExamCatalog") renderAdminExamCatalog();
   if (state.view === "admin")     renderAdminDashboard();
   setTimeout(refreshNetworkStatus, 0);
 }
@@ -5195,7 +5666,7 @@ function renderLoadingScreen(label, percent) {
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
         <img src="./logo.png" alt="이루자 로고"
           style="height:56px;width:auto;object-fit:contain" />
-        <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:-0.5px">안전담당자 자격인증제</div>
+        <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:-0.5px">안전 자격인증제</div>
       </div>
       <div style="width:52px;height:52px;border:5px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite"></div>
       <div style="width:100%;max-width:300px">
@@ -5284,6 +5755,8 @@ async function _submitAdminPassword(event) {
       try { sessionStorage.setItem("hniruja_admin_token", JSON.stringify({ token: result.token, ts: result.ts })); } catch(e) {}
       const admin = { employeeId: result.adminId || "ADM-SERVER", department: "", name: "ADMIN", role: "admin" };
       state.currentUser = admin;
+      if (result.data) applyRemoteData(result.data);
+      activateExamData(state.selectedExamCode || DEFAULT_EXAM_CODE);
       state.view = "admin";
       state.loginError = "";
       closeModal();
@@ -5357,7 +5830,8 @@ function buildHeader() {
       <div class="brand" aria-label="시스템 이름">
         <img class="brand-logo" src="./logo.png" alt="에이치앤이루자 로고" />
         <div>
-          <h1>안전담당자 자격인증제</h1>
+          <h1>안전 자격인증제</h1>
+          ${["candidate", "exam", "result", "admin"].includes(state.view) ? `<p>${escapeHtml(getSelectedExamName())}</p>` : ""}
         </div>
       </div>
       <div class="top-actions">
@@ -5385,6 +5859,7 @@ function logout() {
   state.currentUser  = null;
   state.view         = "login";
   state.adminSection = "dashboard";
+  state.selectedExamCode = DEFAULT_EXAM_CODE;
   state.currentExam  = null;
   state.lastResult   = null;
   state.loginError   = "";
@@ -5433,7 +5908,7 @@ function renderLogin() {
       <div class="login-card v2">
         <div class="login-card-banner">
           <img class="login-banner-logo" src="./logo.png" alt="로고" />
-          <h2 class="login-title">안전담당자 자격인증제</h2>
+          <h2 class="login-title">안전 자격인증제</h2>
         </div>
         <div class="login-card-body">
           
@@ -5537,6 +6012,7 @@ async function handleLogin(event) {
         if (result.data) applyRemoteData(result.data);
         try { sessionStorage.setItem("hniruja_admin_token", JSON.stringify({ token: result.token, ts: result.ts })); } catch(e) {}
         state.currentUser = { employeeId: result.adminId || "ADM-SERVER", department: "", name: "ADMIN", role: "admin" };
+        activateExamData(state.selectedExamCode || DEFAULT_EXAM_CODE);
         state.view        = "admin";
         state.loginError  = "";
         state.isTestMode  = false;
@@ -5589,6 +6065,7 @@ async function handleLogin(event) {
 
       const pendingRetry = await retryPendingSubmissions(candidate.employeeId);
       if (pendingRetry?.ok && pendingRetry.result) {
+        activateExamData(pendingRetry.result.examCode);
         state.lastResult = pendingRetry.result;
         state.view = "result";
         updateLoadingProgress(100, "임시 제출 데이터를 복구했습니다");
@@ -5596,27 +6073,17 @@ async function handleLogin(event) {
         return;
       }
 
+      const assignedExamCode = getCandidateAssignedExamCode(candidate.employeeId);
+      if (!assignedExamCode) {
+        state.loginError = "현재 할당된 시험이 없습니다. 관리자에게 문의해 주세요.";
+        state.currentUser = null;
+        state.view = "login";
+        renderLogin();
+        return;
+      }
+
       updateLoadingProgress(100, "완료!");
-
-      const currentQuarterResult = examResults
-        .filter(result => result.employeeId === candidate.employeeId && result.quarter === getCurrentQuarter())
-        .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
-      if (currentQuarterResult) {
-        state.lastResult = currentQuarterResult;
-        state.view = "result";
-        renderResultScreen();
-        return;
-      }
-
-      let activeRecord = getActiveExamRecord(candidate.employeeId);
-      if (restoreActiveExamRecord(activeRecord)) {
-        renderExamScreen();
-        startTimer();
-        return;
-      }
-
-      state.view = "candidate";
-      renderCandidateDashboard();
+      openSelectedExam(assignedExamCode);
       return;
     } catch (e) {
       console.error("응시 정보 로드 실패", e);
@@ -5639,6 +6106,112 @@ async function handleLogin(event) {
 // 책임: 응시자 대시보드, 시험 진행 전 과정, 타이머, 탭 전환 감지, 채점, 결과 화면
 
 /* ─── 응시자 대시보드 ─────────────────────────── */
+function getExamSettingsForCode(examCode) {
+  const code = normalizeExamCode(examCode);
+  return examSettingsByCode[code] || {
+    examCode: code,
+    totalQuestions: 0,
+    timeLimitMinutes: 30,
+    passingScore: 60,
+    tabSwitchLimit: 3,
+    categoryQuota: {}
+  };
+}
+
+function getExamCatalogStatus(examCode) {
+  const code = normalizeExamCode(examCode);
+  const period = getExamPeriod(code);
+  const employeeId = state.currentUser?.employeeId;
+  const settings = getExamSettingsForCode(code);
+  if (!isCandidateAssigned(employeeId, code)) {
+    return { label: "", action: "응시 불가", complete: false, disabled: true, locked: true, unavailable: true, result: null };
+  }
+  const activeQuestionCount = allQuestionBank.filter((item) => normalizeExamCode(item.examCode) === code && item.active).length;
+  const configuredQuestionCount = Object.values(settings.categoryQuota || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+  if (Number(settings.totalQuestions || 0) <= 0 || activeQuestionCount <= 0 || configuredQuestionCount <= 0) {
+    return { label: "준비 중", action: "문제 등록 전", complete: false, disabled: true, locked: true, result: null };
+  }
+  const result = getBlockingResultForExam(employeeId, code);
+  if (result) {
+    if (code === CRANE_EXAM_CODE) {
+      const availableAt = getCraneRetakeAvailableAt(result);
+      const label = availableAt ? `${formatDateOnly(availableAt.toISOString())} 재응시 가능` : "응시 완료";
+      return { label, action: "결과 보기", complete: true, disabled: false, locked: false, result };
+    }
+    if (result.disqualified) return { label: "실격", action: "결과 보기", complete: true, disabled: false, locked: false, result };
+    return { label: result.passed ? "합격" : "불합격", action: "결과 보기", complete: true, disabled: false, locked: false, result };
+  }
+  const activeKey = getActiveExamKey(employeeId, period, code);
+  const active = allActiveExams.some((item) => item.key === activeKey && !["submitted", "completed", "done"].includes(item.status));
+  if (active) return { label: "응시 중", action: "이어보기", complete: false, disabled: false, locked: false, result: null };
+  return { label: "응시 가능", action: "시험 확인", complete: false, disabled: false, locked: false, result: null };
+}
+
+function getCandidateAssignedExamCode(employeeId = state.currentUser?.employeeId) {
+  return [...exams]
+    .filter((exam) => exam.active !== false)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .find((exam) => isCandidateAssigned(employeeId, exam.code))?.code || null;
+}
+
+function renderExamCatalog() {
+  clearTimer();
+  removeExamGuards();
+  clearIntroCountdown();
+  const assignedExamCode = getCandidateAssignedExamCode();
+  if (assignedExamCode) {
+    openSelectedExam(assignedExamCode);
+    return;
+  }
+  app.innerHTML = `
+    ${buildHeader()}
+    <main class="exam-catalog-wrap">
+      <div class="exam-catalog-head">
+        <h2>현재 할당된 시험이 없습니다</h2>
+        <p>관리자에게 응시 시험 등록을 요청해 주세요.</p>
+      </div>
+      <div class="empty">응시 가능한 시험이 없습니다.</div>
+    </main>`;
+}
+
+function openSelectedExam(examCode) {
+  const status = getExamCatalogStatus(examCode);
+  if (status.unavailable) return;
+  activateExamData(examCode);
+  state.lastResult = null;
+  const user = state.currentUser;
+  const period = getExamPeriod(examCode);
+  const result = status.result || getBlockingResultForExam(user.employeeId, examCode);
+  if (result) {
+    state.lastResult = result;
+    state.view = "result";
+    renderResultScreen();
+    return;
+  }
+  const activeRecord = getActiveExamRecord(user.employeeId, period, examCode);
+  if (restoreActiveExamRecord(activeRecord)) {
+    renderExamScreen();
+    startTimer();
+    return;
+  }
+  state.view = "candidate";
+  renderCandidateDashboard();
+}
+
+function returnToExamCatalog() {
+  if (state.view === "exam" || state.isSubmitting) return;
+  state.lastResult = null;
+  state.currentExam = null;
+  const assignedExamCode = getCandidateAssignedExamCode();
+  if (!assignedExamCode) {
+    state.view = "login";
+    state.loginError = "현재 할당된 시험이 없습니다. 관리자에게 문의해 주세요.";
+    renderLogin();
+    return;
+  }
+  openSelectedExam(assignedExamCode);
+}
+
 function renderCandidateDashboard() {
   state.examGuardActive = false;
   removePreExamGuards();
@@ -5646,10 +6219,15 @@ function renderCandidateDashboard() {
   removeExamGuards();
   clearIntroCountdown();
   const user            = state.currentUser;
-  const quarter         = getCurrentQuarter();
-  const attemptedResult = examResults
-    .filter(r => r.employeeId === user.employeeId && r.quarter === quarter)
-    .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
+  if (!state.isTestMode && !isCandidateAssigned(user.employeeId, getSelectedExamCode())) {
+    state.view = "login";
+    state.loginError = "현재 할당된 시험이 없습니다. 관리자에게 문의해 주세요.";
+    state.currentUser = null;
+    renderLogin();
+    return;
+  }
+  const period          = getExamPeriod();
+  const attemptedResult = getBlockingResultForExam(user.employeeId);
   // 서버 동기화 완료 후에만 결과화면으로 전환 (로컬캐시만 있으면 무시)
   if (attemptedResult && state._remoteLoaded) {
     state.lastResult = attemptedResult;
@@ -5657,7 +6235,7 @@ function renderCandidateDashboard() {
     renderResultScreen();
     return;
   }
-  const activeRecord = getActiveExamRecord(user.employeeId, quarter);
+  const activeRecord = getActiveExamRecord(user.employeeId, period);
   if (restoreActiveExamRecord(activeRecord)) {
     renderExamScreen();
     startTimer();
@@ -5674,7 +6252,7 @@ function renderCandidateDashboard() {
       <div class="ready-body" id="readyBody">
 
         <div class="v2-profile-chips">
-          <span class="v2-chip"><span class="v2-chip-label">분기</span>${escapeHtml(quarter)}</span>
+          <span class="v2-chip"><span class="v2-chip-label">종목</span>${escapeHtml(getExamCategoryName())}</span>
           <span class="v2-chip"><span class="v2-chip-label">소속</span>${escapeHtml(user.department)}</span>
           <span class="v2-chip"><span class="v2-chip-label">성명</span>${escapeHtml(user.name)}</span>
         </div>
@@ -5791,9 +6369,16 @@ function startExam() {
   }
   clearIntroCountdown();
   const user = state.currentUser;
+  const examCode = getSelectedExamCode();
+  const period = getExamPeriod(examCode);
+  if (!state.isTestMode && !isCandidateAssigned(user.employeeId, examCode)) {
+    alert("이 시험의 응시 명단에 등록되어 있지 않습니다.");
+    returnToExamCatalog();
+    return;
+  }
   // §2: 이미 제출 완료 또는 실격이면 결과화면만 표시
   if (!state.isTestMode) {
-    const existingResult = getLatestResult(user.employeeId);
+    const existingResult = getBlockingResultForExam(user.employeeId, examCode);
     if (existingResult) {
       state.lastResult = existingResult;
       state.view = "result";
@@ -5801,8 +6386,8 @@ function startExam() {
       return;
     }
   }
-  if (!state.isTestMode && hasAttemptedThisQuarter(user.employeeId)) {
-    alert("이번 분기에는 이미 응시 완료했습니다.");
+  if (!state.isTestMode && hasAttemptedThisQuarter(user.employeeId, period, examCode)) {
+    alert(examCode === CRANE_EXAM_CODE ? "최근 6개월 이내에 이미 응시했습니다." : "이번 분기에는 이미 응시 완료했습니다.");
     renderCandidateDashboard();
     return;
   }
@@ -5811,23 +6396,24 @@ function startExam() {
     return;
   }
 
-  const activeRecord = getActiveExamRecord(user.employeeId);
+  const activeRecord = getActiveExamRecord(user.employeeId, period, examCode);
   if (!state.isTestMode && restoreActiveExamRecord(activeRecord)) {
     renderExamScreen();
     startTimer();
     return;
   }
 
-  // 응시자와 분기 기준 시드를 먼저 설정한 뒤 문제를 생성합니다.
+  // 응시자와 시험별 응시 주기 기준 시드를 먼저 설정한 뒤 문제를 생성합니다.
   // 진행 중 시험은 저장되어 새로고침 또는 재접속 시 이어서 복구됩니다.
-  _examSeed = _strHash(user.employeeId + getCurrentQuarter());
+  _examSeed = _strHash(user.employeeId + examCode + period);
   _examRng = _seededRng(_examSeed);
   const questions = generateExamQuestions();
   _examRng = null;
 
   state.currentExam = {
     employeeId: user.employeeId,
-    quarter: getCurrentQuarter(),
+    examCode,
+    quarter: period,
     startedAt: new Date().toISOString(),
     questions,
     answers: Array(questions.length).fill(null),
@@ -6498,7 +7084,7 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
 
   if (hasAttemptedThisQuarter(state.currentUser.employeeId, state.currentExam.quarter) && !state.isTestMode) {
     updateSubmitBuffer("이미 제출된 기록을 확인했습니다. 결과 화면으로 이동합니다.");
-    clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
+    clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter, state.currentExam.examCode);
     state.currentExam  = null;
     state.view         = "candidate";
     state.isSubmitting = false;
@@ -6514,8 +7100,9 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
 
   const scoring = calculateScore(state.currentExam);
   const result  = {
-    resultId: makeResultId(state.currentUser.employeeId, state.currentExam.quarter),
+    resultId: makeResultId(state.currentUser.employeeId, state.currentExam.quarter, state.currentExam.examCode),
     employeeId: state.currentUser.employeeId,
+    examCode: normalizeExamCode(state.currentExam.examCode),
     department: state.currentUser.department,
     name: state.currentUser.name,
     quarter: state.currentExam.quarter,
@@ -6543,6 +7130,7 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
   const submitLog = {
     logId: makeLogId(),
     employeeId: state.currentUser.employeeId,
+    examCode: normalizeExamCode(state.currentExam.examCode),
     department: state.currentUser.department,
     name: state.currentUser.name,
     type: result.disqualified ? "DISQUALIFIED_SUBMIT" : (isAutoSubmit ? "AUTO_SUBMIT" : "SUBMIT"),
@@ -6566,11 +7154,13 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
       updateSubmitBuffer("서버에 답안과 결과를 저장하고 있습니다.");
       const saveResult = await appendResultToSheet(result, submitLog);
       if (!saveResult?.ok) throw new Error(saveResult?.message || "서버 저장에 실패했습니다. 다시 제출해 주세요.");
-      clearPendingSubmission(result.employeeId, result.quarter);
+      clearPendingSubmission(result.employeeId, result.quarter, result.examCode);
       updateSubmitBuffer("전송 완료를 확인했습니다. 결과 화면을 준비합니다.");
       examResults.push(result);
       activityLogs.push(submitLog);
-      clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter);
+      allExamResults.push(result);
+      allActivityLogs.push(submitLog);
+      clearActiveExamRecord(state.currentUser.employeeId, state.currentExam.quarter, state.currentExam.examCode);
     } else {
       updateSubmitBuffer("데모 모드 결과를 생성하고 있습니다.");
     }
@@ -6599,9 +7189,7 @@ function renderResultScreen() {
   clearIntroCountdown();
   hideSubmitBuffer();
   const serverResult = state.currentUser
-    ? examResults
-        .filter((r) => r.employeeId === state.currentUser.employeeId && r.quarter === getCurrentQuarter())
-        .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0]
+    ? getBlockingResultForExam(state.currentUser.employeeId, getSelectedExamCode())
     : null;
 
   const rawResult = state.lastResult || serverResult;
@@ -6620,13 +7208,18 @@ function renderResultScreen() {
   const wrong    = Math.max(0, result.totalCount - result.correctCount);
   const resultDept = result.department || state.currentUser?.department || "-";
   const resultName = result.name || state.currentUser?.name || "-";
-  const resultQuarter = result.quarter || getCurrentQuarter();
+  const resultQuarter = result.quarter || getExamPeriod(result.examCode);
+  const resultExam = getExamDefinition(result.examCode);
+  const showChatInvite = passed && resultExam.chatInviteEnabled !== false;
 
   app.innerHTML = `
     ${buildHeader()}
     <main class="container v2-container">
+      <div class="selected-exam-banner">
+        <div><span class="muted">응시 시험</span><br><strong>${escapeHtml(getExamDisplayName(result.examCode))}</strong></div>
+      </div>
       <div class="v2-profile-chips result-profile-chips" aria-label="응시자 결과 요약">
-        <span class="v2-chip"><span class="v2-chip-label">분기</span>${escapeHtml(resultQuarter)}</span>
+        <span class="v2-chip"><span class="v2-chip-label">${getExamPeriodTitle(result.examCode)}</span>${escapeHtml(resultQuarter)}</span>
         <span class="v2-chip"><span class="v2-chip-label">소속</span>${escapeHtml(resultDept)}</span>
         <span class="v2-chip"><span class="v2-chip-label">성명</span>${escapeHtml(resultName)}</span>
       </div>
@@ -6656,7 +7249,7 @@ function renderResultScreen() {
 
       </section>
 
-      ${passed ? `
+      ${showChatInvite ? `
       <aside class="pass-chat-invite" aria-label="안전담당자 단체채팅방 안내">
         <a class="pass-chat-link" href="https://open.kakao.com/o/gBK6YeHh" target="_blank" rel="noopener noreferrer">
           <img class="pass-chat-icon" src="data:image/png;base64,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" alt="카카오톡"/>
@@ -7284,6 +7877,68 @@ function refreshQuestionTable() {
   reapplyAdminTableFilters(table);
 }
 
+function renderAdminExamCatalog() {
+  clearTimer();
+  removeExamGuards();
+  const availableExams = [...exams].filter((exam) => exam.active !== false).sort((a, b) => a.sortOrder - b.sortOrder);
+  app.innerHTML = `
+    ${buildHeader()}
+    <main class="exam-catalog-wrap">
+      <div class="exam-catalog-head">
+        <span class="badge admin">관리자 모드</span>
+        <h2 style="margin-top:12px">관리할 시험을 선택해 주세요</h2>
+        <p>응시자·문제·시간·결과가 시험별로 각각 관리됩니다.</p>
+      </div>
+      <div class="exam-catalog-grid">
+        ${availableExams.map((exam) => `
+          <article class="exam-choice-card ${exam.code === CRANE_EXAM_CODE ? "crane" : ""}">
+            <div class="exam-choice-emoji" aria-hidden="true">${getExamEmoji(exam.code)}</div>
+            <h3>${escapeHtml(getExamDisplayName(exam.code))}</h3>
+            <button class="btn primary exam-choice-action" type="button" onclick="openAdminExam('${escapeHtml(exam.code)}')">관리하기</button>
+          </article>`).join("") || `<div class="empty">관리할 수 있는 시험이 없습니다.</div>`}
+      </div>
+    </main>`;
+}
+
+function openAdminExam(examCode) {
+  syncCurrentExamCaches();
+  activateExamData(examCode);
+  state.adminSection = "dashboard";
+  state.view = "admin";
+  state.lastResult = null;
+  state.filters.qbCategory = "전체";
+  state.filters.qbSearch = "";
+  resetUserFilterState();
+  resetResultFilterState();
+  resetAdminResultsPage();
+  resetAdminLogsPage();
+  questionStatsLoaded = false;
+  render();
+}
+
+function switchAdminExamTab(examCode) {
+  const section = state.adminSection || "dashboard";
+  syncCurrentExamCaches();
+  activateExamData(examCode);
+  state.adminSection = section;
+  state.view = "admin";
+  state.lastResult = null;
+  state.filters.qbCategory = "전체";
+  state.filters.qbSearch = "";
+  resetUserFilterState();
+  resetResultFilterState();
+  resetAdminResultsPage();
+  resetAdminLogsPage();
+  questionStatsLoaded = false;
+  renderAdminDashboard();
+}
+
+function returnToAdminExamCatalog() {
+  syncCurrentExamCaches();
+  state.view = "adminExamCatalog";
+  render();
+}
+
 function renderAdminDashboard() {
   clearTimer();
   removeExamGuards();
@@ -7303,6 +7958,10 @@ function renderAdminDashboard() {
     <div class="admin-layout">
       <aside class="sidebar">
         <span class="badge admin">관리자 모드</span>
+        <div class="admin-exam-tabs" role="tablist" aria-label="관리 시험 선택">
+          <button class="admin-exam-tab ${getSelectedExamCode() === DEFAULT_EXAM_CODE ? "active" : ""}" type="button" role="tab" aria-selected="${getSelectedExamCode() === DEFAULT_EXAM_CODE}" onclick="switchAdminExamTab('${DEFAULT_EXAM_CODE}')">🦺<br>안전담당자</button>
+          <button class="admin-exam-tab crane ${getSelectedExamCode() === CRANE_EXAM_CODE ? "active" : ""}" type="button" role="tab" aria-selected="${getSelectedExamCode() === CRANE_EXAM_CODE}" onclick="switchAdminExamTab('${CRANE_EXAM_CODE}')">🏗️<br>크레인</button>
+        </div>
         <nav aria-label="관리자 메뉴">
           ${adminNavButton("dashboard", "대시보드 홈")}
           ${adminNavButton("users",     "응시자 관리")}
@@ -7327,9 +7986,15 @@ function renderAdminDashboard() {
   setTimeout(() => initAdminTableFilters(), 0);
 }
 
+function changeAdminExam(examCode) {
+  openAdminExam(examCode);
+}
+
 function adminNavButton(section, label) {
+  const resetUsers = section === "users" ? "resetUserFilterState();" : "";
+  const resetResults = section === "results" ? "resetResultFilterState(); resetAdminResultsPage();" : "";
   return `<button class="btn nav-btn ${state.adminSection === section ? "active" : ""}" type="button"
-    onclick="state.adminSection='${section}'; renderAdminDashboard();">${label}</button>`;
+    onclick="state.adminSection='${section}'; ${resetUsers} ${resetResults} renderAdminDashboard();">${label}</button>`;
 }
 
 /* ─── 대시보드 홈 ──────────────────────────────── */
@@ -7354,13 +8019,13 @@ function renderAdminHome() {
 
     <div class="grid four">
       <div class="metric"><div class="label">총 응시자 수</div><div class="value">${metrics.totalCandidates}</div></div>
-      <div class="metric"><div class="label">이번 분기 완료</div><div class="value">${metrics.completed}</div></div>
+      <div class="metric"><div class="label">현재 주기 완료</div><div class="value">${metrics.completed}</div></div>
       <div class="metric"><div class="label">미응시 인원</div><div class="value">${metrics.pending}</div></div>
       <div class="metric"><div class="label">평균 점수</div><div class="value">${metrics.avgScore}점</div></div>
       <div class="metric"><div class="label">합격률</div><div class="value">${metrics.passRate}%</div></div>
       <div class="metric"><div class="label">실격자 수</div><div class="value">${metrics.disqualifiedCount}</div></div>
       <div class="metric"><div class="label">활성 문항</div><div class="value">${questionBank.filter(q => q.active).length}</div></div>
-      <div class="metric"><div class="label">현재 분기</div><div class="value" style="font-size:24px">${getCurrentQuarter()}</div></div>
+      <div class="metric"><div class="label">현재 ${getExamPeriodTitle()}</div><div class="value" style="font-size:24px">${getExamPeriod()}</div></div>
     </div>
 
     <div class="grid two" style="margin-top:16px">
@@ -7400,11 +8065,11 @@ function renderAdminHome() {
         </dl>
       </section>
       <section class="card" style="grid-column:1/-1">
-        <div class="section-head"><h3>분기별 응시 현황</h3></div>
+        <div class="section-head"><h3>${getExamPeriodTitle()}별 응시 현황</h3></div>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>분기</th><th>응시 인원</th><th>합격</th><th>불합격</th><th>실격</th><th>평균 점수</th><th>합격률</th></tr>
+              <tr><th>${getExamPeriodTitle()}</th><th>응시 인원</th><th>합격</th><th>불합격</th><th>실격</th><th>평균 점수</th><th>합격률</th></tr>
             </thead>
             <tbody>
               ${(() => {
@@ -7437,9 +8102,11 @@ function renderAdminHome() {
 }
 
 function getDashboardMetrics() {
-  const quarter        = getCurrentQuarter();
   const totalCandidates = getCandidateUsers().length;
-  const currentResults = examResults.filter(r => r.quarter === quarter).map(getRegradedResult);
+  const currentResults = getCandidateUsers()
+    .map((user) => getBlockingResultForExam(user.employeeId, getSelectedExamCode()))
+    .filter(Boolean)
+    .map(getRegradedResult);
   const completed      = new Set(currentResults.map(r => r.employeeId)).size;
   const pending        = totalCandidates - completed;
   const nonDisqualified = currentResults.filter(r => !r.disqualified);
@@ -7512,15 +8179,17 @@ function adminRefreshData() {
 // 책임: 응시자 목록 조회, 필터, 응시자 추가 모달
 
 // ── 응시자 상태/정렬 헬퍼 ────────────────────────────────────────────────
-// 관리자 응시상태는 반드시 "현재 분기" 기준으로 계산합니다.
-// 과거 분기의 실격/제출 기록이 현재 분기의 응시 전/응시 중 상태를 덮어쓰지 않도록 분리합니다.
-function getCurrentQuarterResult(employeeId, quarter = getCurrentQuarter()) {
+// 안전담당자는 현재 분기, 크레인은 최근 응시일로부터 6개월을 현재 운영 주기로 봅니다.
+function getCurrentQuarterResult(employeeId, quarter = getExamPeriod()) {
+  if (getSelectedExamCode() === CRANE_EXAM_CODE) {
+    return getBlockingResultForExam(employeeId, CRANE_EXAM_CODE);
+  }
   return examResults
     .filter(result => result.employeeId === employeeId && result.quarter === quarter)
     .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0] || null;
 }
 
-function getUserExamStatus(user, quarter = getCurrentQuarter()) {
+function getUserExamStatus(user, quarter = getExamPeriod()) {
   const result = getCurrentQuarterResult(user.employeeId, quarter);
   const activeRecord = result ? null : getActiveExamRecord(user.employeeId, quarter);
 
@@ -7876,7 +8545,7 @@ async function openSubmittedAnswerModal(encodedEmployeeId, encodedQuarter = "", 
             <button class="btn" type="button" onclick="closeModal()">닫기</button>
           </div>
           <div class="ar-summary-strip">
-            <div class="ar-summary-chip"><span class="key">분기</span><span class="val">${escapeHtml(latest.quarter || "-")}</span></div>
+            <div class="ar-summary-chip"><span class="key">${getExamPeriodTitle()}</span><span class="val">${escapeHtml(latest.quarter || "-")}</span></div>
             <div class="ar-summary-chip"><span class="key">소속</span><span class="val">${escapeHtml(personDept || "-")}</span></div>
             <div class="ar-summary-chip"><span class="key">성명</span><span class="val">${escapeHtml(personName || "-")}</span></div>
             <div class="ar-summary-chip"><span class="key">점수</span><span class="val">${liveScore}점</span></div>
@@ -7902,7 +8571,7 @@ function _buildUserRowsHtml(rows) {
 
   return sorted.map(user => {
     const status     = getUserExamStatus(user);
-    const latest     = status.result; // 현재 분기 결과만 사용
+    const latest     = status.result; // 선택 시험의 현재 응시 주기 결과만 사용
     const activeRec  = status.activeRecord;
     const displayLatest = latest ? getRegradedResult(latest) : null;
     const userType   = _getUserType(user);
@@ -8022,7 +8691,7 @@ function renderUserManager() {
   return `
     <section class="card">
       <div class="section-head">
-        <div><h2>응시자 관리</h2><p style="margin:4px 0 0;color:var(--muted);font-size:13px">🟡 응시 중 표시는 여러 명 동시 반영됩니다. 최신 현황은 ⟳ 새로고침 후 확인하세요.</p></div>
+        <div><h2>${getExamEmoji()} ${escapeHtml(getSelectedExamName())} 응시자 관리</h2><p style="margin:4px 0 0;color:var(--muted);font-size:13px">이 명단은 다른 시험과 별도로 관리됩니다. 🟡 응시 중 현황은 ⟳ 새로고침 후 확인하세요.</p></div>
         <div style="display:flex;gap:8px">
           <button id="refreshBtn" class="btn" type="button" onclick="refreshFromRemote()">⟳ 새로고침</button>
           <button class="btn primary" type="button" onclick="openUserModal()">응시자 추가</button>
@@ -8108,11 +8777,15 @@ function filterUsers() {
 }
 
 function resetUserFilters() {
+  resetUserFilterState();
+  renderAdminDashboard();
+}
+
+function resetUserFilterState() {
   state.filters.userSearch     = "";
   state.filters.userType       = "전체";
   state.filters.userDepartment = "전체";
   state.filters.userStatus     = "전체";
-  renderAdminDashboard();
 }
 
 function openUserModal() {
@@ -8172,37 +8845,71 @@ function generateEmployeeId(department = "", name = "") {
 }
 
 
-function addUser(event) {
+async function addUser(event) {
   event.preventDefault();
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
   const form       = new FormData(event.currentTarget);
   const type       = String(form.get("type") || "이루자").trim();
   const department = String(form.get("department")).trim();
   const name       = String(form.get("name")).trim();
   const employeeId = generateEmployeeId(department, name);
+  const existingUser = users.find(user => isCandidateRole(user.role) && user.department === department && user.name === name);
+  const targetEmployeeId = existingUser?.employeeId || employeeId;
 
-  if (users.some(user => user.role === "candidate" && user.department === department && user.name === name)) {
-    alert("같은 소속과 성명의 응시자가 이미 있습니다. 로그인 혼동 방지를 위해 이름 표기를 구분해 주세요.");
+  if (isCandidateAssigned(targetEmployeeId, getSelectedExamCode())) {
+    alert("이 응시자는 이미 " + getSelectedExamName() + " 명단에 등록되어 있습니다.");
     return;
   }
-  users.push({ employeeId, department, name, role: "candidate" });
-  savePersistentData();
-  closeModal();
-  renderAdminDashboard();
+
+  const candidate = existingUser || { employeeId: targetEmployeeId, department, name, role: "candidate" };
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "저장 중...";
+  }
+
+  try {
+    if (isExternalApiRuntime()) {
+      const saved = await callExternalApi("upsertExamCandidateData", {
+        user: candidate,
+        examCode: getSelectedExamCode()
+      });
+      if (!saved?.ok) throw new Error(saved?.message || "응시자 저장에 실패했습니다.");
+    } else if (!isAppsScriptRuntime()) {
+      throw new Error("서버 연결을 사용할 수 없습니다.");
+    }
+
+    if (!existingUser) users.push(candidate);
+    assignCandidateToExam(targetEmployeeId, getSelectedExamCode());
+    if (isAppsScriptRuntime()) savePersistentData();
+    resetUserFilterState();
+    closeModal();
+    renderAdminDashboard();
+  } catch (error) {
+    console.error("응시자 추가 실패", error);
+    alert("응시자 추가에 실패했습니다: " + (error.message || error));
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "추가";
+    }
+  }
 }
 
 async function resetCandidateRecords(employeeId) {
   const user = users.find(item => item.employeeId === employeeId);
   if (!user) return;
-  if (!confirm(user.department + " " + user.name + "의 응시 기록을 초기화하시겠습니까?")) return;
+  if (!confirm(user.department + " " + user.name + "의 " + getSelectedExamName() + " 응시 기록을 초기화하시겠습니까?")) return;
 
   examResults = examResults.filter(result => result.employeeId !== employeeId);
   activityLogs = activityLogs.filter(log => log.employeeId !== employeeId);
   activeExams = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
+  allExamResults = allExamResults.filter(result => result.employeeId !== employeeId || normalizeExamCode(result.examCode) !== getSelectedExamCode());
+  allActivityLogs = allActivityLogs.filter(log => log.employeeId !== employeeId || normalizeExamCode(log.examCode) !== getSelectedExamCode());
+  allActiveExams = allActiveExams.filter(a => a.employeeId !== employeeId || normalizeExamCode(a.examCode) !== getSelectedExamCode());
   overwriteLocalCache();
 
   try {
     if (isExternalApiRuntime()) {
-      const res = await callExternalApi("resetCandidateData", { employeeId });
+      const res = await callExternalApi("resetCandidateData", { employeeId, examCode: getSelectedExamCode() });
       if (res && res.ok === false) throw new Error(res.message || "응시 기록 초기화 실패");
     }
     alert("응시 기록 초기화가 저장되었습니다.");
@@ -8214,26 +8921,37 @@ async function resetCandidateRecords(employeeId) {
 }
 
 async function deleteCandidate(employeeId) {
-  const user = users.find(item => item.employeeId === employeeId);
-  if (!user) return;
-  if (!confirm(user.department + " " + user.name + " 응시자를 삭제할까요? 해당 응시자의 시험 결과와 로그도 함께 삭제됩니다.")) return;
+  const examCode = getSelectedExamCode();
+  const user = users.find(item => item.employeeId === employeeId)
+    || getCandidateProfilePool(examCode).find(item => item.employeeId === employeeId);
+  if (!user) {
+    alert("응시자 정보를 찾지 못했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.");
+    return;
+  }
+  if (!confirm(user.department + " " + user.name + " 응시자를 삭제할까요? 이 시험의 결과와 진행 기록도 함께 삭제됩니다.")) return;
 
-  users = users.filter(item => item.employeeId !== employeeId);
   examResults = examResults.filter(r => r.employeeId !== employeeId);
   activityLogs = activityLogs.filter(l => l.employeeId !== employeeId);
   activeExams = activeExams.filter(a => a.key?.split("__")[0] !== employeeId);
-  if (state.currentUser?.employeeId === employeeId) logout();
+  allExamResults = allExamResults.filter(r => r.employeeId !== employeeId || normalizeExamCode(r.examCode) !== examCode);
+  allActivityLogs = allActivityLogs.filter(l => l.employeeId !== employeeId || normalizeExamCode(l.examCode) !== examCode);
+  allActiveExams = allActiveExams.filter(a => a.employeeId !== employeeId || normalizeExamCode(a.examCode) !== examCode);
+  deactivateCandidateForExam(employeeId, examCode);
   overwriteLocalCache();
 
   try {
     if (isExternalApiRuntime()) {
-      const res = await callExternalApi("deleteCandidateData", { employeeId });
+      const res = await callExternalApi("deleteExamAssignmentData", {
+        employeeId,
+        examCode,
+        user: { employeeId, department: user.department || "", name: user.name || "", role: "candidate" }
+      });
       if (res && res.ok === false) throw new Error(res.message || "응시자 삭제 실패");
     }
-    alert("응시자 삭제가 저장되었습니다.");
+    alert("응시자를 삭제했습니다.");
   } catch (e) {
     console.warn("응시자 삭제 실패", e);
-    alert("응시자 삭제 저장에 실패했습니다: " + (e.message || e));
+    alert("응시자 삭제에 실패했습니다: " + (e.message || e));
   }
   renderAdminDashboard();
 }
@@ -8252,7 +8970,7 @@ function renderAffiliationManager() {
     return list.map(dep => `
       <tr>
         <td style="padding:10px 14px;font-size:14px;font-weight:600">${escapeHtml(dep.name)}</td>
-        <td style="padding:10px 14px;text-align:center;font-size:14px">${users.filter(u=>u.role==="candidate"&&u.department===dep.name).length}명</td>
+        <td style="padding:10px 14px;text-align:center;font-size:14px">${getCandidateUsers().filter(u=>u.department===dep.name).length}명</td>
         <td style="padding:10px 14px;text-align:center"><button class="btn danger small" onclick="removeAffiliation('${escapeHtml(dep.name)}','${escapeHtml(dep.type)}')">삭제</button></td>
       </tr>`).join("");
   }
@@ -8650,7 +9368,7 @@ function renderSettingsManager() {
       <form onchange="updateExamSettings(event)">
         <div class="grid three">
           <div class="field">
-            <label for="settingTotal">분기별 출제 문항 수</label>
+            <label for="settingTotal">회차별 출제 문항 수</label>
             <input id="settingTotal" name="totalQuestions" type="number" min="1" value="${examSettings.totalQuestions}" readonly>
           </div>
           <div class="field">
@@ -8698,7 +9416,7 @@ function renderSettingsManager() {
       <div class="notice" style="margin-top:14px">
         현재 카테고리별 출제 수 합계는
         <strong>${Object.values(examSettings.categoryQuota).reduce((a, b) => a + Number(b), 0)}</strong>문항입니다.
-        분기별 출제 문항 수는 카테고리별 출제 수 합계로 자동 계산됩니다.
+        회차별 출제 문항 수는 카테고리별 출제 수 합계로 자동 계산됩니다.
       </div>
     </section>
   `;
@@ -8873,6 +9591,21 @@ function ensureAdminResultsPageLoaded() {
     });
 }
 
+function syncAdminResultsPageFromLocal() {
+  const pageState = state.adminResultsPage;
+  const filteredRows = filterResults();
+  const pageSize = Number(pageState.pageSize || 50);
+  const maxPage = Math.max(0, Math.ceil(filteredRows.length / pageSize) - 1);
+  pageState.page = Math.min(maxPage, Math.max(0, Number(pageState.page || 0)));
+  const start = pageState.page * pageSize;
+  pageState.rows = filteredRows.slice(start, start + pageSize);
+  pageState.total = filteredRows.length;
+  pageState.signature = getAdminResultsSignature();
+  pageState.loaded = true;
+  pageState.loading = false;
+  pageState.error = "";
+}
+
 function ensureAdminLogsPageLoaded() {
   const signature = getAdminLogsSignature();
   const pageState = state.adminLogsPage;
@@ -8906,10 +9639,12 @@ function ensureAdminLogsPageLoaded() {
 function renderResultsManager() {
   const quarters = [...new Set(examResults.map(r => r.quarter).filter(Boolean))].sort((a,b) => String(b).localeCompare(String(a), "ko"));
   const pageState = state.adminResultsPage;
-  setTimeout(() => ensureAdminResultsPageLoaded(), 0);
+  // 대시보드와 동일하게 이미 정규화된 전체 데이터를 사용합니다.
+  // 별도 DB 재조회 시 exam_code가 비어 있는 과거 기록이 누락되는 문제를 방지합니다.
+  syncAdminResultsPageFromLocal();
   const rows = pageState.rows || [];
   const grouped = rows.reduce((acc, row) => {
-    const key = row.quarter || "분기 미지정";
+    const key = row.quarter || "응시주기 미지정";
     if (!acc[key]) acc[key] = [];
     acc[key].push(row);
     return acc;
@@ -8935,7 +9670,7 @@ function renderResultsManager() {
           </select>
         </div>
         <div class="field">
-          <label for="resultQuarter">분기</label>
+          <label for="resultQuarter">${getExamPeriodTitle()}</label>
           <select id="resultQuarter" onchange="onAdminResultFilterChange('resultQuarter', this.value);">
             ${optionHtml("전체", state.filters.resultQuarter)}
             ${quarters.map(q => optionHtml(q, state.filters.resultQuarter)).join("")}
@@ -9022,11 +9757,15 @@ function filterResults() {
   return rows;
 }
 
-function resetResultFilters() {
+function resetResultFilterState() {
   state.filters.resultDepartment   = "전체";
   state.filters.resultQuarter      = "전체";
   state.filters.resultSort         = "dateDesc";
   state.filters.resultDisqualified = "전체";
+}
+
+function resetResultFilters() {
+  resetResultFilterState();
   resetAdminResultsPage();
   renderAdminDashboard();
 }
@@ -9038,7 +9777,10 @@ function resetResultFilters() {
 // 책임: 통계 시각화 (점수 분포, 부서별 평균, 합격 비율, 카테고리 문항 수)
 
 function renderStatsManager() {
-  const currentResults = examResults.filter(r => r.quarter === getCurrentQuarter()).map(getRegradedResult);
+  const currentResults = getCandidateUsers()
+    .map((user) => getBlockingResultForExam(user.employeeId, getSelectedExamCode()))
+    .filter(Boolean)
+    .map(getRegradedResult);
   const scoreDist      = getScoreDistribution(examResults);
   const categoryCounts = getCategoryCounts().map(item => ({ label: item.category, value: item.count }));
   const statusRatio    = [
@@ -9079,9 +9821,9 @@ function renderStatsManager() {
     </div>
 
     <section class="card" style="margin-top:16px">
-      <div class="section-head"><h3>이번 분기 요약</h3></div>
+      <div class="section-head"><h3>현재 응시주기 요약</h3></div>
       <div class="grid three">
-        <div class="metric"><div class="label">이번 분기 결과 수</div><div class="value">${currentResults.length}</div></div>
+        <div class="metric"><div class="label">현재 주기 결과 수</div><div class="value">${currentResults.length}</div></div>
         <div class="metric"><div class="label">최고 점수</div><div class="value">${currentResults.length ? Math.max(...currentResults.map(r => r.percentageScore)) : 0}</div></div>
         <div class="metric"><div class="label">실격자</div><div class="value">${currentResults.filter(r => r.disqualified).length}</div></div>
       </div>
@@ -9144,7 +9886,7 @@ function renderLogManager() {
   <script>
     // ── 앱 진입점 ──
     function restoreExamFromActiveRecord(user) {
-      return restoreActiveExamRecord(getActiveExamRecord(user.employeeId));
+      return restoreActiveExamRecord(getActiveExamRecord(user.employeeId, getExamPeriod(), getSelectedExamCode()));
     }
 
     function initApp() {
@@ -9188,10 +9930,11 @@ function renderLogManager() {
 
         state.currentUser  = savedSession.user;
         state.adminSection = savedSession.adminSection || "dashboard";
+        state.selectedExamCode = normalizeExamCode(savedSession.selectedExamCode);
         state.isTestMode   = false;
 
         // 관리자는 관리자 데이터가 필요하므로 이때만 전체 데이터를 로드합니다.
-        if (savedSession.user.role === "admin" || savedSession.view === "admin") {
+        if (savedSession.user.role === "admin" || savedSession.view === "admin" || savedSession.view === "adminExamCatalog") {
           renderLoadingScreen("관리자 데이터를 불러오는 중입니다", 60);
           loadRemoteData((adminOk) => {
             if (!adminOk) {
@@ -9199,6 +9942,7 @@ function renderLogManager() {
               finishLoginScreen();
               return;
             }
+            activateExamData(state.selectedExamCode || DEFAULT_EXAM_CODE);
             state.view = "admin";
             render();
           });
@@ -9209,23 +9953,31 @@ function renderLogManager() {
           renderLoadingScreen("응시 정보를 확인하는 중입니다", 60);
           await loadCandidateRuntimeData(savedSession.user);
 
+          const assignedExamCode = getCandidateAssignedExamCode(savedSession.user.employeeId);
+          if (!assignedExamCode) {
+            state.currentUser = null;
+            state.loginError = "현재 할당된 시험이 없습니다. 관리자에게 문의해 주세요.";
+            finishLoginScreen();
+            return;
+          }
+
           const pendingRetry = await retryPendingSubmissions(savedSession.user.employeeId);
           if (pendingRetry?.ok && pendingRetry.result) {
+            activateExamData(pendingRetry.result.examCode);
             state.lastResult = pendingRetry.result;
             state.view = "result";
             render();
             return;
           }
 
+          activateExamData(assignedExamCode);
           let restored = false;
           if (savedSession.view === "exam") {
             restored = restoreExamFromActiveRecord(savedSession.user);
             if (!restored) state.view = "candidate";
           } else if (savedSession.view === "result") {
             const empId = savedSession.user.employeeId;
-            const serverResult = examResults
-              .filter(r => r.employeeId === empId && r.quarter === getCurrentQuarter())
-              .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))[0];
+            const serverResult = getBlockingResultForExam(empId, getSelectedExamCode());
             if (serverResult) {
               state.lastResult = serverResult;
               state.view = "result";
@@ -9235,11 +9987,11 @@ function renderLogManager() {
               state.view = "candidate";
             }
           } else {
-            state.view = savedSession.view === "candidate" ? "candidate" : "login";
-            restored = state.view !== "login";
+            state.view = "candidate";
+            restored = true;
           }
 
-          if (!restored && state.view !== "candidate") state.view = "login";
+          if (!restored && state.view !== "candidate") state.view = "candidate";
           render();
           if (state.view === "exam" && state.currentExam) {
             setTimeout(() => { startTimer(); }, 100);
