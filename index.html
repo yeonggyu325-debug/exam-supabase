@@ -1091,6 +1091,39 @@ tr:last-child td { border-bottom: 0; }
 .v2-result-stat-key { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
 .v2-result-date { text-align: center; font-size: 13px; color: var(--muted); padding: 16px; margin: 0; }
 
+/* 개인별 응시이력 */
+.candidate-history-trigger { width: min(540px, 100%); margin: 14px auto 0; }
+.candidate-history-open-btn { width: 100%; }
+.candidate-history-modal { width: min(760px, 100%); padding: 0; overflow: hidden; }
+.candidate-history-title { padding: 18px 20px 15px; border-bottom: 1px solid var(--line); }
+.candidate-history-title h3 { margin: 0; font-size: 17px; font-weight: 900; letter-spacing: -.02em; }
+.candidate-history-title p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.candidate-history-row {
+  display: grid; grid-template-columns: 1.25fr 1fr .65fr .7fr .75fr;
+  align-items: center; gap: 10px; padding: 12px 18px;
+  border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.candidate-history-row:last-child { border-bottom: 0; }
+.candidate-history-head { background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 800; }
+.candidate-history-cell { min-width: 0; }
+.candidate-history-exam { font-weight: 900; color: var(--text); }
+.candidate-history-score { font-size: 15px; font-weight: 950; color: var(--primary-dark); }
+.candidate-history-status { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 900; }
+.candidate-history-status.pass { color: var(--success); background: var(--success-bg); }
+.candidate-history-status.fail { color: var(--danger); background: var(--danger-bg); }
+.candidate-history-status.disq { color: #a16207; background: #fefce8; }
+.candidate-history-empty { padding: 22px; text-align: center; color: var(--muted); font-size: 13px; }
+.candidate-history-modal .modal-actions { margin: 0; padding: 14px 18px; border-top: 1px solid var(--line); }
+
+@media (max-width: 640px) {
+  .candidate-history-title { padding: 15px 16px 12px; }
+  .candidate-history-head { display: none; }
+  .candidate-history-row:not(.candidate-history-head) { grid-template-columns: 1fr 1fr; gap: 9px 14px; padding: 14px 16px; }
+  .candidate-history-cell { display: grid; gap: 2px; }
+  .candidate-history-cell::before { content: attr(data-label); color: var(--muted); font-size: 11px; font-weight: 750; }
+  .candidate-history-status { justify-self: start; }
+}
+
 /* 모바일 조정 */
 @media (max-width: 640px) {
   .v2-exam-bar { top: 51px; }
@@ -7183,6 +7216,67 @@ async function submitExam(isAutoSubmit = false, forceDisqualified = false, submi
 
 
 /* ─── 결과 화면 ───────────────────────────────── */
+function renderCandidateExamHistory(employeeId, currentResult = null) {
+  const unique = new Map();
+  const source = [...(allExamResults || [])];
+  if (currentResult) source.push(currentResult);
+
+  source
+    .filter((item) => String(item?.employeeId || "") === String(employeeId || ""))
+    .forEach((item) => {
+      const key = item.resultId
+        || [normalizeExamCode(item.examCode), item.quarter || "", item.submittedAt || ""].join("|");
+      unique.set(String(key), item);
+    });
+
+  const rows = [...unique.values()]
+    .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+  return rows.length ? `
+        <div class="candidate-history-row candidate-history-head" aria-hidden="true">
+          <span>응시종목</span><span>응시일</span><span>점수</span><span>정답</span><span>결과</span>
+        </div>
+        <div class="candidate-history-list">
+          ${rows.map((item) => {
+            const status = item.disqualified ? "실격" : (item.passed ? "합격" : "불합격");
+            const statusClass = item.disqualified ? "disq" : (item.passed ? "pass" : "fail");
+            const score = Number.isFinite(Number(item.percentageScore)) ? Number(item.percentageScore) : 0;
+            const correct = Number.isFinite(Number(item.correctCount)) ? Number(item.correctCount) : 0;
+            const total = Number.isFinite(Number(item.totalCount)) ? Number(item.totalCount) : 0;
+            return `
+              <div class="candidate-history-row">
+                <span class="candidate-history-cell candidate-history-exam" data-label="응시종목">${escapeHtml(getExamCategoryName(item.examCode))}</span>
+                <span class="candidate-history-cell" data-label="응시일">${escapeHtml(formatDateOnly(item.submittedAt))}</span>
+                <span class="candidate-history-cell candidate-history-score" data-label="점수">${score}점</span>
+                <span class="candidate-history-cell" data-label="정답">${correct}/${total}</span>
+                <span class="candidate-history-cell" data-label="결과"><span class="candidate-history-status ${statusClass}">${status}</span></span>
+              </div>`;
+          }).join("")}
+        </div>` : `<div class="candidate-history-empty">응시이력이 없습니다.</div>`;
+}
+
+function openCandidateExamHistory() {
+  const currentResult = state.lastResult || (state.currentUser
+    ? getBlockingResultForExam(state.currentUser.employeeId, getSelectedExamCode())
+    : null);
+  const employeeId = currentResult?.employeeId || state.currentUser?.employeeId;
+  if (!employeeId) return;
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="candidateHistoryTitle" onclick="if(event.target===this) closeModal()">
+      <section class="modal candidate-history-modal">
+        <div class="candidate-history-title">
+          <h3 id="candidateHistoryTitle">응시이력</h3>
+          <p>안전담당자와 크레인 시험의 개인별 점수를 확인할 수 있습니다.</p>
+        </div>
+        ${renderCandidateExamHistory(employeeId, currentResult)}
+        <div class="modal-actions">
+          <button class="btn primary" type="button" onclick="closeModal()">닫기</button>
+        </div>
+      </section>
+    </div>`;
+}
+
 function renderResultScreen() {
   clearTimer();
   removeExamGuards();
@@ -7208,18 +7302,14 @@ function renderResultScreen() {
   const wrong    = Math.max(0, result.totalCount - result.correctCount);
   const resultDept = result.department || state.currentUser?.department || "-";
   const resultName = result.name || state.currentUser?.name || "-";
-  const resultQuarter = result.quarter || getExamPeriod(result.examCode);
   const resultExam = getExamDefinition(result.examCode);
   const showChatInvite = passed && resultExam.chatInviteEnabled !== false;
 
   app.innerHTML = `
     ${buildHeader()}
     <main class="container v2-container">
-      <div class="selected-exam-banner">
-        <div><span class="muted">응시 시험</span><br><strong>${escapeHtml(getExamDisplayName(result.examCode))}</strong></div>
-      </div>
       <div class="v2-profile-chips result-profile-chips" aria-label="응시자 결과 요약">
-        <span class="v2-chip"><span class="v2-chip-label">${getExamPeriodTitle(result.examCode)}</span>${escapeHtml(resultQuarter)}</span>
+        <span class="v2-chip"><span class="v2-chip-label">응시종목</span>${escapeHtml(getExamCategoryName(result.examCode))}</span>
         <span class="v2-chip"><span class="v2-chip-label">소속</span>${escapeHtml(resultDept)}</span>
         <span class="v2-chip"><span class="v2-chip-label">성명</span>${escapeHtml(resultName)}</span>
       </div>
@@ -7248,6 +7338,10 @@ function renderResultScreen() {
         </div>
 
       </section>
+
+      <div class="candidate-history-trigger">
+        <button class="btn candidate-history-open-btn" type="button" onclick="openCandidateExamHistory()">응시이력 확인</button>
+      </div>
 
       ${showChatInvite ? `
       <aside class="pass-chat-invite" aria-label="안전담당자 단체채팅방 안내">
