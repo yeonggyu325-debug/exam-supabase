@@ -3330,6 +3330,24 @@ tbody tr:hover td { background: rgba(239,246,255,.48) !important; }
   .excel-sort-menu { width: min(300px, calc(100vw - 12px)); }
 }
 
+/* 모바일 시험 안내 화면: 내부 스크롤 해제 */
+@media (max-width: 820px) {
+  .ready-layout {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .ready-body {
+    flex: none !important;
+    overflow: visible !important;
+  }
+
+  .ready-footer {
+    position: static !important;
+  }
+}
+    
 </style>
 </head>
 <body>
